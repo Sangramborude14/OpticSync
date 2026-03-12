@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import { NotificationManager } from './notifications/NotificationManager';
 import FocusShifter from './assets/focusshifter.jsx';
 
 // Eye Landmark Indices
@@ -54,6 +55,10 @@ function App() {
   });
 
   useEffect(() => {
+    NotificationManager.requestPermission();
+  }, []);
+
+  useEffect(() => {
     // Only initialize MediaPipe if we are on the dashboard tab so the video element exists
     if (activeTab !== 'dashboard') return;
 
@@ -62,6 +67,7 @@ function App() {
 
     let faceMesh;
     let camera;
+    let worker;
 
     const initEngine = async () => {
         if (!window.FaceMesh || !window.Camera) {
@@ -161,6 +167,7 @@ function App() {
                 if (state.strain >= 80 && !state.modalTriggered && now > state.modalCooldownUntil) {
                     state.modalTriggered = true;
                     setIsModalOpen(true);
+                    NotificationManager.sendHighFatigueAlert(Math.round(state.strain));
                 }
                 
             } else {
@@ -187,6 +194,19 @@ function App() {
         });
         
         camera.start();
+
+        // Start background worker for running in another tab
+        worker = new Worker(new URL('./background/backgroundWorker.js', import.meta.url), { type: 'module' });
+        worker.postMessage({ action: 'start', interval: 150 });
+        worker.onmessage = async (e) => {
+            if (e.data.type === 'tick') {
+                if (document.hidden && faceMesh && videoElement && videoElement.readyState >= 2) {
+                    try {
+                        await faceMesh.send({ image: videoElement });
+                    } catch (err) { }
+                }
+            }
+        };
     };
     
     initEngine();
@@ -194,6 +214,10 @@ function App() {
     return () => {
         if (camera) camera.stop();
         if (faceMesh) faceMesh.close();
+        if (worker) {
+            worker.postMessage({ action: 'stop' });
+            worker.terminate();
+        }
     };
   }, [activeTab]); // Re-run if we switch back to dashboard
 
