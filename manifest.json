@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "OptiSync - Cognitive OS",
+  "version": "1.0",
+  "description": "Real-time eye strain monitoring and burnout prevention via MediaPipe.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["styles.css"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "OptiSync"
+  }
+}

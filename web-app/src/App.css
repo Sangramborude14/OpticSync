@@ -1,0 +1,438 @@
+.dashboard-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 280px;
+  background: rgba(15, 16, 21, 0.8);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 3rem;
+}
+
+.brand h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1abc9c, #2ecc71);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  padding: 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-link:hover, .nav-link.active {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+.nav-link.active {
+  border-left: 3px solid var(--accent-teal);
+  border-radius: 0 12px 12px 0;
+  background: linear-gradient(90deg, rgba(26, 188, 156, 0.1), transparent);
+}
+
+.main-content {
+  flex: 1;
+  padding: 2rem 3rem;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+.header h2 {
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.glass-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 2rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px 0 rgba(26, 188, 156, 0.15);
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Webcam Widget Layout */
+.webcam-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.webcam-card h3 {
+  margin-bottom: 1.5rem;
+  color: var(--text-muted);
+  width: 100%;
+  text-align: left;
+}
+
+.video-container {
+  width: 100%;
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.webcam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  filter: grayscale(20%) contrast(1.1);
+}
+
+.webcam-status-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+  z-index: 10;
+}
+
+/* Metrics Panel Layout */
+.metrics-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.metrics-panel h3 {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.metrics-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.diagnostic-block {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 1.25rem 1.5rem;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.diagnostic-block:hover {
+    transform: translateY(-2px);
+    border-color: rgba(26, 188, 156, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.diag-icon {
+    background: rgba(0, 0, 0, 0.3);
+    color: rgba(255,255,255,0.7);
+    width: 65px;
+    height: 65px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.03);
+    flex-shrink: 0;
+}
+
+.diag-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.diag-content h4 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 1.5px;
+    margin-bottom: 0.4rem;
+}
+
+.diag-value.huge-text {
+    font-size: 2.8rem;
+}
+
+.huge-text {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff, #a0aec0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+
+.status-block-premium {
+    margin-bottom: 1.5rem;
+    border-width: 2px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2) inset;
+    padding: 2rem 1rem !important;
+}
+
+.premium-strain-box {
+    background: linear-gradient(145deg, rgba(20,20,22,0.6), rgba(30,30,35,0.8));
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    padding: 2rem;
+    border-radius: 24px;
+}
+
+.thick-progress {
+    height: 16px !important;
+    border-radius: 10px !important;
+    background: rgba(0,0,0,0.6) !important;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.progress-bar-container {
+  width: 100%;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s ease, background 0.5s ease;
+}
+
+.custom-test-btn {
+    width: 100%;
+    background: rgba(255,255,255,0.02) !important;
+    color: rgba(255,255,255,0.5) !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    padding: 16px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-weight: 500;
+}
+.custom-test-btn:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: white !important;
+}
+
+/* Therapy Grid (Tab Content) */
+.therapy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.therapy-card {
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.therapy-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-5px);
+  border-color: var(--accent-teal);
+}
+
+.therapy-card .icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.therapy-card h3 {
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.therapy-card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Fullscreen Modal */
+.fullscreen-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content-wrapper {
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 71, 87, 0.3);
+  box-shadow: 0 24px 64px rgba(255, 71, 87, 0.2);
+  border-radius: 24px;
+  padding: 4rem;
+  text-align: center;
+  max-width: 900px;
+  width: 90%;
+}
+
+.danger-glow {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: var(--danger-red);
+  text-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
+  margin-bottom: 1.5rem;
+}
+
+.modal-content-wrapper p {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  margin-bottom: 3rem;
+  line-height: 1.6;
+}
+
+.btn-huge {
+  font-size: 1.5rem;
+  padding: 1.5rem 3rem;
+  background: linear-gradient(135deg, var(--danger-red), #e84118);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 10px 30px rgba(255, 71, 87, 0.3);
+}
+
+.btn-huge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(255, 71, 87, 0.4);
+}
+
+.therapy-menu-view h2 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+.modal-columns {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+}
+
+.modal-col {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  padding: 2rem;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-col h3 {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.therapy-option-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+
+.therapy-option-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 1.5rem;
+  width: 100%;
+  display: block;
+}
+
+.btn-text:hover {
+  color: white;
+}
