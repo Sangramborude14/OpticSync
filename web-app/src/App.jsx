@@ -4,7 +4,7 @@ import { NotificationManager } from './notifications/NotificationManager';
 import PalmingAudio from './PalmingAudio';
 import Module20 from './20Module';
 import EyeMassage from './EyeMassage';
-import FocusShifter from './assets/focusshifter.jsx';
+import FocusShifter from './assets/FocusShifter.jsx';
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
