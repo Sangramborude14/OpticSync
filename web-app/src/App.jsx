@@ -6,6 +6,8 @@ import Module20 from './20Module';
 import EyeMassage from './EyeMassage';
 import FocusShifter from './assets/FocusShifter.jsx';
 import HistoryLog from './HistoryLog.jsx';
+import InfinityTracker from './infinityTracker.jsx';
+import CornerTaps from './corner tap.jsx';
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -39,10 +41,17 @@ function App() {
   const [statusText, setStatusText] = useState("Downloading AI Models (Takes 5-10s first time)...");
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [therapyView, setTherapyView] = useState('initial'); // 'initial', 'menu', or 'active'
+  const [therapyView, setTherapyView] = useState('initial'); // 'initial', 'menu', or 'active', 'proximity_hazard'
   const [activeModule, setActiveModule] = useState(null);
   const [backendStatus, setBackendStatus] = useState('checking');
   const [, setRenderTick] = useState(0); 
+  const [lookAwayDisplay, setLookAwayDisplay] = useState(45);
+  const [connectionStatus, setConnectionStatus] = useState('idle'); 
+  
+  // New Proximity States
+  const [currentDistance, setCurrentDistance] = useState(null);
+  const [proximityStatus, setProximityStatus] = useState('SAFE'); // 'SAFE', 'WARNING', 'HAZARD'
+  const [proximityTimeLeft, setProximityTimeLeft] = useState(90);
 
   useEffect(() => {
     const checkBackend = () => {
@@ -55,7 +64,6 @@ function App() {
     const interval = setInterval(checkBackend, 30000);
     return () => clearInterval(interval);
   }, []);
-
   const videoRef = useRef(null);
   const engineState = useRef({
     blinks: 0,
@@ -68,7 +76,11 @@ function App() {
     blinkStartTime: 0,
     lastTime: Date.now(),
     healthyBlinkStartTime: null,
-    lastFaceTime: Date.now()
+    lastFaceTime: Date.now(),
+    lookAwayActive: false,
+    lookAwayTimeLeft: 0,
+    proximityStartTime: null,
+    proximityAlertTriggered: false
   });
 
   useEffect(() => {
@@ -112,6 +124,24 @@ function App() {
             const dtSec = Math.min(0.1, Math.max(0, (now - state.lastTime) / 1000.0));
             state.lastTime = now;
 
+            if (state.lookAwayActive) {
+                if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                    state.lookAwayTimeLeft -= dtSec;
+                    setLookAwayDisplay(Math.max(0, state.lookAwayTimeLeft));
+                    if (state.lookAwayTimeLeft <= 0) {
+                        state.lookAwayActive = false;
+                        state.strain = 0;
+                        state.modalTriggered = false;
+                        state.modalCooldownUntil = now + 60000;
+                        setStrainLevel(0);
+                        setIsModalOpen(false);
+                        setTherapyView('initial');
+                        setTimeout(() => alert("✅ 45-Second Look Away Complete!\n\nYour eye strain has been safely reset to 0%."), 100);
+                        return;
+                    }
+                }
+            }
+
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                 setStatusText("Engine Active - Tracking");
                 state.lastFaceTime = now;
@@ -123,6 +153,9 @@ function App() {
                 
                 // Expose Live EAR string to React State for the Dashboard to render smoothly
                 setLiveEAR(averageEAR.toFixed(3));
+
+                // Broadcast raw landmarks for advanced therapy modules (like Gaze Tracking)
+                window.dispatchEvent(new CustomEvent('OPTISYNC_LANDMARKS', { detail: landmarks }));
 
                 const CLOSED_THRESH = 0.20;
                 const PARTIAL_THRESH = 0.26;
@@ -180,13 +213,45 @@ function App() {
                 // Chrome Extension Integration: Broadcast live strain to content.js
                 window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedStrain } }));
 
-                // Modal Trigger
-                if (state.strain >= 80 && !state.modalTriggered && now > state.modalCooldownUntil) {
-                    state.modalTriggered = true;
-                    setIsModalOpen(true);
-                    NotificationManager.sendHighFatigueAlert(Math.round(state.strain));
-                }
+                // --- PROXIMITY DETECTION ENGINE ---
+                // Heuristic: Use the distance between inner eye corners (landmarks 133 and 362)
+                // On a standard 720p/1080p webcam, 25cm is roughly where the eye-span takes up ~18% of frame width.
+                const innerDist = calculateDistance(landmarks[133], landmarks[362]);
                 
+                // Estimate CM (Rough calibration: 25cm approx 0.18 normalized dist)
+                // Formula: Dist_cm = Constant / Normalized_Pixel_Dist
+                const estimatedCm = Math.round(4.5 / innerDist);
+                setCurrentDistance(estimatedCm);
+
+                if (estimatedCm < 25) {
+                    if (!state.proximityStartTime) {
+                        state.proximityStartTime = now;
+                    }
+                    const elapsed = (now - state.proximityStartTime) / 1000;
+                    const remaining = Math.max(0, 90 - elapsed);
+                    setProximityTimeLeft(Math.floor(remaining));
+                    
+                    if (remaining < 30) {
+                        setProximityStatus('HAZARD');
+                    } else {
+                        setProximityStatus('WARNING');
+                    }
+
+                    // Trigger Alert at 90 seconds
+                    if (remaining <= 0 && !state.proximityAlertTriggered) {
+                        state.proximityAlertTriggered = true;
+                        setTherapyView('proximity_hazard');
+                        setIsModalOpen(true);
+                        NotificationManager.sendProximityAlert();
+                    }
+                } else {
+                    // Reset proximity timer if they move back
+                    state.proximityStartTime = null;
+                    state.proximityAlertTriggered = false;
+                    setProximityTimeLeft(90);
+                    setProximityStatus('SAFE');
+                }
+
             } else {
                 setStatusText("No Face Detected (Resting)");
                 setLiveEAR("N/A");
@@ -219,7 +284,14 @@ function App() {
             if (e.data.type === 'tick') {
                 if (document.hidden && faceMesh && videoElement && videoElement.readyState >= 2) {
                     try {
-                        await faceMesh.send({ image: videoElement });
+                        // MediaPipe skips processing if the video timestamp hasn't changed (frozen background tab).
+                        // Drawing to an offscreen canvas sidesteps the internal timestamp check and prevents it from halting!
+                        const offscreen = document.createElement('canvas');
+                        offscreen.width = videoElement.videoWidth;
+                        offscreen.height = videoElement.videoHeight;
+                        const ctx = offscreen.getContext('2d');
+                        ctx.drawImage(videoElement, 0, 0, offscreen.width, offscreen.height);
+                        await faceMesh.send({ image: offscreen });
                     } catch (err) { }
                 }
             }
@@ -274,6 +346,20 @@ function App() {
           return;
       }
       
+      if (moduleName === "Infinity Tracker") {
+          setActiveModule("Infinity Tracker");
+          setTherapyView('active');
+          if (!isModalOpen) setIsModalOpen(true);
+          return;
+      }
+      
+      if (moduleName === "Corner Taps") {
+          setActiveModule("Corner Taps");
+          setTherapyView('active');
+          if (!isModalOpen) setIsModalOpen(true);
+          return;
+      }
+      
       // Hackathon Simulation: Fake a successful session completion for unbuilt modules
       alert(`[SIMULATION RUNNING] Starting virtual session: ${moduleName}...\n\n(Click OK to fast-forward 5 minutes and simulate successful completion)`);
       
@@ -291,14 +377,10 @@ function App() {
   };
 
   const abortSession = () => {
-      alert("⚠️ Session Aborted!\n\nIf you must return to work, PLEASE look away from the screen for at least 2 minutes. OptiSync will continue to monitor your camera for resting behavior.");
-      setIsModalOpen(false);
-      setTherapyView('initial');
-      setActiveModule(null);
-      
-      // Do NOT reset the strain to 50! Give a 2-minute cooldown so the modal doesn't immediately snap back while they try to look away.
-      engineState.current.modalCooldownUntil = Date.now() + 120 * 1000; 
-      engineState.current.modalTriggered = false;
+      setTherapyView('look_away');
+      engineState.current.lookAwayActive = true;
+      engineState.current.lookAwayTimeLeft = 45;
+      setLookAwayDisplay(45);
   };
 
   useEffect(() => {
@@ -371,13 +453,41 @@ function App() {
             <h2>Welcome back.</h2>
             <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Cognitive operating system active.</p>
           </div>
-          <button className="btn-primary" 
-             onClick={() => {
-                 window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: Math.round(strainLevel) } }));
-                 alert("🟢 Status: Connected!\n\nOptiSync is now successfully bridging raw AI engine data to the Chrome Extension globally.");
+          <button 
+             className={`btn-primary connection-btn ${connectionStatus}`}
+             onClick={async () => {
+                 setConnectionStatus('connecting');
+                 try {
+                    const granted = await NotificationManager.requestPermission();
+                    if (granted) {
+                        setConnectionStatus('active');
+                        NotificationManager.sendTestAlert();
+                        window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: Math.round(strainLevel) } }));
+                    } else {
+                        setConnectionStatus('error');
+                        console.error("Notification permission denied.");
+                    }
+                 } catch (err) {
+                    setConnectionStatus('error');
+                 }
              }}
-             style={{ background: 'linear-gradient(135deg, #1abc9c, #2ecc71)', padding: '12px 24px', borderRadius: '12px', border: 'none', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>
-            Link Chrome Extension
+             style={{ 
+                background: connectionStatus === 'active' ? '#2ecc71' : connectionStatus === 'error' ? '#ff4757' : 'linear-gradient(135deg, #1abc9c, #2ecc71)', 
+                padding: '12px 24px', 
+                borderRadius: '12px', 
+                border: 'none', 
+                color: '#fff', 
+                fontWeight: '600', 
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+             }}>
+            {connectionStatus === 'idle' && <><span>🔗</span> Link Chrome Extension & Enable Alerts</>}
+            {connectionStatus === 'connecting' && <><span>⌛</span> Requesting Permissions...</>}
+            {connectionStatus === 'active' && <><span>✅</span> OptiSync Linked & Active</>}
+            {connectionStatus === 'error' && <><span>❌</span> Permission Denied (Check Settings)</>}
           </button>
         </header>
 
@@ -421,13 +531,31 @@ function App() {
                          <div className="diag-value huge-text" style={{ color: '#1abc9c'}}>{liveEAR}</div>
                      </div>
                  </div>
+
+                 {/* Block 3: Proximity Sensor */}
+                 <div className={`diagnostic-block proximity-block ${proximityStatus.toLowerCase()}`}>
+                     <div className="diag-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                     </div>
+                     <div className="diag-content">
+                         <h4>Screen distance</h4>
+                         <div className="diag-value huge-text">
+                             {currentDistance || "--"} <span style={{fontSize: '1rem'}}>cm</span>
+                         </div>
+                     </div>
+                     {proximityStatus !== 'SAFE' && (
+                         <div className="proximity-timer-badge">
+                             {proximityTimeLeft}s
+                         </div>
+                     )}
+                 </div>
               </div>
 
-              {/* Block 3: Status Module */}
-              <div className="diagnostic-block status-block-premium" style={{ borderColor: ringColor, background: `rgba(255,255,255,0.02)` }}>
+              {/* Block 4: Status Module */}
+              <div className="diagnostic-block status-block-premium" style={{ borderColor: proximityStatus === 'HAZARD' ? '#ff4757' : ringColor, background: `rgba(255,255,255,0.02)` }}>
                  <div className="diag-content" style={{ width: '100%', textAlign: 'center' }}>
                      <h4 style={{ letterSpacing: '2px', color: 'rgba(255,255,255,0.5)' }}>SYSTEM STATUS OVERRIDE</h4>
-                     <div className="status-label" style={{color: ringColor, fontSize: '1.8rem', margin: '10px 0', textShadow: `0 0 15px ${ringColor}80`, fontFamily: 'Outfit', fontWeight: 700}}>{statusDisplay}</div>
+                     <div className="status-label" style={{color: proximityStatus === 'HAZARD' ? '#ff4757' : ringColor, fontSize: '1.8rem', margin: '10px 0', textShadow: `0 0 15px ${proximityStatus === 'HAZARD' ? '#ff4757' : ringColor}80`, fontFamily: 'Outfit', fontWeight: 700}}>{statusDisplay}</div>
                  </div>
               </div>
 
@@ -580,21 +708,87 @@ function App() {
                      </div>
                      <button className="btn-text" onClick={abortSession} style={{ marginTop: '3rem' }}>Abort Session (Return to work)</button>
                   </div>
+               ) : therapyView === 'look_away' ? (
+                  <div className="look-away-view" style={{ textAlign: 'center', padding: '2rem' }}>
+                     <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#fff' }}>Rest Your Eyes</h2>
+                     <p style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.7)' }}>
+                        Please look away from the screen for 45 seconds to naturally recover.
+                     </p>
+                     <div style={{ marginTop: '3rem', fontSize: '6rem', fontWeight: '800', fontFamily: 'Outfit, sans-serif', color: lookAwayDisplay < 45 ? '#2ecc71' : '#f39c12', textShadow: `0 0 30px ${lookAwayDisplay < 45 ? 'rgba(46, 204, 113, 0.4)' : 'rgba(243, 156, 18, 0.4)'}` }}>
+                        {lookAwayDisplay.toFixed(1)}s
+                     </div>
+                     <p style={{ marginTop: '2rem', fontStyle: 'italic', opacity: 0.8, color: '#fff' }}>
+                        {lookAwayDisplay === 45 ? "Timer will start when you look away from the camera." : "Great! Keep looking away... Timer pauses if you look back."}
+                     </p>
+                     <button className="btn-text mt-4" onClick={() => {
+                        engineState.current.lookAwayActive = false;
+                        engineState.current.modalCooldownUntil = Date.now() + 120 * 1000;
+                        engineState.current.modalTriggered = false;
+                        setIsModalOpen(false);
+                        setTherapyView('initial');
+                     }} style={{ marginTop: '3rem', color: '#ff4757' }}>Force Quit (Not Recommended)</button>
+                  </div>
+               ) : therapyView === 'proximity_hazard' ? (
+                  <div className="proximity-hazard-view" style={{ textAlign: 'center', padding: '2rem' }}>
+                     <h1 className="danger-glow pulse-red">PROXIMITY HAZARD</h1>
+                     <div className="warning-icon-large">⚠️</div>
+                     <p style={{ fontSize: '1.4rem', color: '#fff', maxWidth: '600px', margin: '0 auto 2rem' }}>
+                        You have been dangerously close to the screen (&lt; 25cm) for 90 seconds. 
+                        This causes significant **Ciliary Muscle contraction** and long-term vision damage.
+                     </p>
+                     <h2 style={{ color: '#ff4757', fontSize: '2rem', marginBottom: '2rem' }}>Please move back at least 50cm to continue.</h2>
+                     <button className="btn-huge" onClick={() => {
+                        setIsModalOpen(false);
+                        setTherapyView('initial');
+                        engineState.current.proximityStartTime = null;
+                        engineState.current.proximityAlertTriggered = false;
+                     }}>I have adjusted my position</button>
+                  </div>
                ) : (
-                  activeModule === "Focus Shifter" && (
-                     <FocusShifter 
-                        onComplete={() => {
-                           engineState.current.strain = 0;
-                           engineState.current.modalTriggered = false;
-                           engineState.current.modalCooldownUntil = Date.now() + 60000;
-                           setStrainLevel(0);
-                           setIsModalOpen(false);
-                           setTherapyView('initial');
-                           setActiveModule(null);
-                        }}
-                        onCancel={abortSession}
-                     />
-                  )
+                  <>
+                     {activeModule === "Focus Shifter" && (
+                        <FocusShifter 
+                           onComplete={() => {
+                              engineState.current.strain = 0;
+                              engineState.current.modalTriggered = false;
+                              engineState.current.modalCooldownUntil = Date.now() + 60000;
+                              setStrainLevel(0);
+                              setIsModalOpen(false);
+                              setTherapyView('initial');
+                              setActiveModule(null);
+                           }}
+                           onCancel={abortSession}
+                        />
+                     )}
+                     {activeModule === "Infinity Tracker" && (
+                        <InfinityTracker 
+                           onComplete={() => {
+                              engineState.current.strain = 0;
+                              engineState.current.modalTriggered = false;
+                              engineState.current.modalCooldownUntil = Date.now() + 60000;
+                              setStrainLevel(0);
+                              setIsModalOpen(false);
+                              setTherapyView('initial');
+                              setActiveModule(null);
+                           }}
+                           onCancel={abortSession}
+                        />
+                     )}
+                     {activeModule === "Corner Taps" && (
+                        <CornerTaps 
+                           onComplete={() => {
+                              engineState.current.strain = 0;
+                              engineState.current.modalTriggered = false;
+                              engineState.current.modalCooldownUntil = Date.now() + 60000;
+                              setStrainLevel(0);
+                              setIsModalOpen(false);
+                              setTherapyView('initial');
+                              setActiveModule(null);
+                           }}
+                           onCancel={abortSession}
+                        />
+                     )}
+                  </>
                )}
             </div>
          </div>

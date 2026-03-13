@@ -1,12 +1,32 @@
 export class NotificationManager {
-  static requestPermission() {
+  static async requestPermission() {
     if (!("Notification" in window)) {
       console.warn("This browser does not support desktop notifications.");
-      return;
+      return false;
     }
     
-    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-      Notification.requestPermission();
+    if (Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      return permission === "granted";
+    }
+    
+    return Notification.permission === "granted";
+  }
+
+  static sendTestAlert() {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      try {
+        const n = new Notification("OptiSync OS: Connection Verified", {
+          body: "Your cognitive operating system is now synchronized with the Chrome extension. We'll monitor your strain and alert you when a reset is needed.",
+          icon: "/vite.svg",
+          tag: "optisync-connect",
+          requireInteraction: false
+        });
+        n.onclick = () => window.focus();
+      } catch (e) {
+        console.error("Failed to send test notification:", e);
+      }
     }
   }
 
@@ -14,21 +34,45 @@ export class NotificationManager {
     if (!("Notification" in window)) return;
 
     if (Notification.permission === "granted") {
-      const notification = new Notification("OptiSync: High Fatigue Alert", {
-        body: `Your eye strain has reached ${strainLevel}%. Please take a break immediately!`,
-        icon: "/vite.svg" 
-      });
-      
-      notification.onclick = function() {
-        window.focus(); // Brings the browser tab into focus
-        this.close();
-      };
-    } else if (Notification.permission !== "denied") {
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          this.sendHighFatigueAlert(strainLevel);
-        }
-      });
+      try {
+        const notification = new Notification("OptiSync: High Fatigue Alert", {
+          body: `Your eye strain has reached ${strainLevel}%. Please take a break immediately!`,
+          icon: "/vite.svg",
+          requireInteraction: true // Ensures it stays on screen until dismissed so the user actually sees it!
+        });
+        
+        notification.onclick = function() {
+          window.focus(); // Brings the browser tab into focus
+          this.close();
+        };
+      } catch (e) {
+        console.error("Failed to send notification:", e);
+      }
+    } else if (Notification.permission === "default") {
+      // Don't request inside the background worker! Simply log it.
+      console.warn("Notification permission is not granted. Cannot send background alert.");
+      // If we are in the foreground, we could request it, but typically we shouldn't unless triggered by click.
+    }
+  }
+
+  static sendProximityAlert() {
+    if (!("Notification" in window)) return;
+
+    if (Notification.permission === "granted") {
+      try {
+        const notification = new Notification("CRITICAL: Proximity Hazard", {
+          body: "You have been too close to the screen for over 90 seconds. This is damaging your vision. Please move back!",
+          icon: "/vite.svg",
+          requireInteraction: true
+        });
+        
+        notification.onclick = function() {
+          window.focus();
+          this.close();
+        };
+      } catch (e) {
+        console.error("Failed to send notification:", e);
+      }
     }
   }
 }
