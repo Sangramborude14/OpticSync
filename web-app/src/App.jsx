@@ -5,7 +5,6 @@ import PalmingAudio from './PalmingAudio';
 import Module20 from './20Module';
 import EyeMassage from './EyeMassage';
 import FocusShifter from './assets/FocusShifter.jsx';
-import FocusShifter from './assets/focusshifter.jsx';
 import InfinityTracker from './infinityTracker.jsx';
 import CornerTaps from './corner tap.jsx';
 
