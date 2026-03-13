@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { NotificationManager } from './notifications/NotificationManager';
+import PalmingAudio from './PalmingAudio';
+import Module20 from './20Module';
+import EyeMassage from './EyeMassage';
+import FocusShifter from './assets/FocusShifter.jsx';
 import FocusShifter from './assets/focusshifter.jsx';
 import InfinityTracker from './infinityTracker.jsx';
 import CornerTaps from './corner tap.jsx';
@@ -234,6 +238,27 @@ function App() {
   const handleTherapyClick = (moduleName) => {
       console.log(`[OptiSync OS] Target Module Activated: ${moduleName}`);
       
+      if (moduleName === 'Palming Audio') {
+          setActiveTab('palming');
+          setIsModalOpen(false);
+          setTherapyView('initial');
+          return;
+      }
+
+      if (moduleName === '20-20-20 Module') {
+          setActiveTab('module20');
+          setIsModalOpen(false);
+          setTherapyView('initial');
+          return;
+      }
+
+      if (moduleName === 'Eye Massage') {
+          setActiveTab('eyeMassage');
+          setIsModalOpen(false);
+          setTherapyView('initial');
+          return;
+      }
+      
       if (moduleName === "Focus Shifter") {
           setActiveModule("Focus Shifter");
           setTherapyView('active');
@@ -440,6 +465,54 @@ function App() {
                </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'palming' && (
+            <PalmingAudio 
+                onComplete={() => {
+                    setActiveTab('therapy');
+                    engineState.current.strain = 0; 
+                    engineState.current.modalTriggered = false;
+                    engineState.current.modalCooldownUntil = Date.now() + 60000; // 1 minute grace period
+                    setStrainLevel(0);
+                    alert("✅ Therapy Sequence Complete!\n\nYour eye strain has been safely reset to 0%.");
+                }}
+                onCancel={() => {
+                    setActiveTab('therapy');
+                }}
+            />
+        )}
+
+        {activeTab === 'module20' && (
+            <Module20 
+                onComplete={() => {
+                    setActiveTab('therapy');
+                    engineState.current.strain = 0; 
+                    engineState.current.modalTriggered = false;
+                    engineState.current.modalCooldownUntil = Date.now() + 60000; 
+                    setStrainLevel(0);
+                    alert("✅ 20-20-20 Rule Complete!\n\nYour eye strain has been safely reset to 0%.");
+                }}
+                onCancel={() => {
+                    setActiveTab('therapy');
+                }}
+            />
+        )}
+
+        {activeTab === 'eyeMassage' && (
+            <EyeMassage 
+                onComplete={() => {
+                    setActiveTab('therapy');
+                    engineState.current.strain = 0; 
+                    engineState.current.modalTriggered = false;
+                    engineState.current.modalCooldownUntil = Date.now() + 60000; 
+                    setStrainLevel(0);
+                    alert("✅ Acupressure Eye Massage Complete!\n\nYour eye strain has been safely reset to 0%.");
+                }}
+                onCancel={() => {
+                    setActiveTab('therapy');
+                }}
+            />
         )}
       </main>
 
