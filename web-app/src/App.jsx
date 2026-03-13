@@ -5,6 +5,7 @@ import PalmingAudio from './PalmingAudio';
 import Module20 from './20Module';
 import EyeMassage from './EyeMassage';
 import FocusShifter from './assets/FocusShifter.jsx';
+import HistoryLog from './HistoryLog.jsx';
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -40,8 +41,21 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [therapyView, setTherapyView] = useState('initial'); // 'initial', 'menu', or 'active'
   const [activeModule, setActiveModule] = useState(null);
-  const [, setRenderTick] = useState(0); // Used to ensure React always renders 30fps smooth updates
-  
+  const [backendStatus, setBackendStatus] = useState('checking');
+  const [, setRenderTick] = useState(0); 
+
+  useEffect(() => {
+    const checkBackend = () => {
+      fetch('http://localhost:5001/api/health')
+        .then(res => res.json())
+        .then(data => setBackendStatus(data.mongodb === 'Connected' ? 'live' : 'error'))
+        .catch(() => setBackendStatus('offline'));
+    };
+    checkBackend();
+    const interval = setInterval(checkBackend, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const videoRef = useRef(null);
   const engineState = useRef({
     blinks: 0,
@@ -287,6 +301,25 @@ function App() {
       engineState.current.modalTriggered = false;
   };
 
+  useEffect(() => {
+    // Periodically post the current strain to the backend to build the history log
+    const syncInterval = setInterval(() => {
+        const currentStrain = engineState.current?.strain || 0;
+        const currentBlinks = engineState.current?.blinks || 0;
+        
+        // We only post if engine is active or tracking was started
+        if (activeTab === 'dashboard') {
+             fetch('http://localhost:5001/api/strain', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ strain: Math.round(currentStrain), blinkCount: currentBlinks })
+             }).catch(err => console.log('Backend sync warning: is server running?'));
+        }
+    }, 15000); // Sync every 15 seconds for testing purposes
+    
+    return () => clearInterval(syncInterval);
+  }, [activeTab]);
+
   return (
     <div className="dashboard-container">
       {/* Sidebar */}
@@ -307,13 +340,28 @@ function App() {
           <li className={`nav-link ${activeTab === 'therapy' ? 'active' : ''}`} onClick={() => setActiveTab('therapy')}>
             <span>✦</span> Therapy Modules
           </li>
-          <li className="nav-link">
+          <li className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
             <span>◷</span> History Log
           </li>
           <li className="nav-link">
             <span>⚙</span> Settings
           </li>
         </ul>
+
+        <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+             <div style={{ 
+               width: '8px', 
+               height: '8px', 
+               borderRadius: '50%', 
+               background: backendStatus === 'live' ? '#2ecc71' : backendStatus === 'checking' ? '#f1c40f' : '#ff4757', 
+               boxShadow: `0 0 8px ${backendStatus === 'live' ? '#2ecc71' : backendStatus === 'checking' ? '#f1c40f' : '#ff4757'}` 
+             }}></div>
+             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+               Backend {backendStatus === 'live' ? 'Live' : backendStatus === 'checking' ? 'Connecting...' : 'Offline'}
+             </span>
+          </div>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -493,6 +541,10 @@ function App() {
                     setActiveTab('therapy');
                 }}
             />
+        )}
+
+        {activeTab === 'history' && (
+            <HistoryLog />
         )}
       </main>
 
