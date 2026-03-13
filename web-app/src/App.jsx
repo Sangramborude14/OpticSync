@@ -35,7 +35,7 @@ function calculateEAR(landmarks, eyeIndices) {
 
 function App() {
   const [strainLevel, setStrainLevel] = useState(0);
-  const [blinkCount, setBlinkCount] = useState(0);
+  const [blinkRate, setBlinkRate] = useState(0);
   const [liveEAR, setLiveEAR] = useState("0.00");
   const [statusText, setStatusText] = useState("Downloading AI Models (Takes 5-10s first time)...");
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -48,8 +48,10 @@ function App() {
   
   // New Proximity States
   const [currentDistance, setCurrentDistance] = useState(null);
+  const [restingDistance, setRestingDistance] = useState(50); 
+  const [safeDistanceThreshold, setSafeDistanceThreshold] = useState(35); // Default 35cm as requested
   const [proximityStatus, setProximityStatus] = useState('SAFE'); // 'SAFE', 'WARNING', 'HAZARD'
-  const [proximityTimeLeft, setProximityTimeLeft] = useState(90);
+  const [proximityTimeLeft, setProximityTimeLeft] = useState(30);
   
   const videoRef = useRef(null);
   const engineState = useRef({
@@ -67,7 +69,8 @@ function App() {
     lookAwayActive: false,
     lookAwayTimeLeft: 0,
     proximityStartTime: null,
-    proximityAlertTriggered: false
+    proximityAlertTriggered: false,
+    safeThreshold: 35
   });
 
   useEffect(() => {
@@ -169,7 +172,6 @@ function App() {
                             // Full blink -> Decreases Strain
                             state.blinks++;
                             state.blinkHistory.push(now);
-                            setBlinkCount(state.blinks);
                             
                             // Normal blink recovery
                             state.strain -= 1.0; // Reasonable per-blink healing
@@ -182,6 +184,7 @@ function App() {
 
                 state.blinkHistory = state.blinkHistory.filter(timestamp => now - timestamp <= 60000);
                 const bpm = state.blinkHistory.length;
+                setBlinkRate(bpm);
 
                 // Staring Penalty
                 if (bpm < 5) {
@@ -202,29 +205,30 @@ function App() {
 
                 // --- PROXIMITY DETECTION ENGINE ---
                 // Heuristic: Use the distance between inner eye corners (landmarks 133 and 362)
-                // On a standard 720p/1080p webcam, 25cm is roughly where the eye-span takes up ~18% of frame width.
+                // Optimized Calibration: Dist_cm = Constant / Normalized_Pixel_Dist
+                // Constant 5.5 is more accurate for typical laptop webcams (approx 0.11 dist at 50cm)
                 const innerDist = calculateDistance(landmarks[133], landmarks[362]);
                 
-                // Estimate CM (Rough calibration: 25cm approx 0.18 normalized dist)
-                // Formula: Dist_cm = Constant / Normalized_Pixel_Dist
-                const estimatedCm = Math.round(4.5 / innerDist);
+                // Estimate CM
+                const estimatedCm = Math.round(5.5 / innerDist);
                 setCurrentDistance(estimatedCm);
 
-                if (estimatedCm < 25) {
+                // Use ref value to avoid closure staleness after calibration
+                if (estimatedCm < state.safeThreshold) {
                     if (!state.proximityStartTime) {
                         state.proximityStartTime = now;
                     }
                     const elapsed = (now - state.proximityStartTime) / 1000;
-                    const remaining = Math.max(0, 90 - elapsed);
+                    const remaining = Math.max(0, 30 - elapsed);
                     setProximityTimeLeft(Math.floor(remaining));
                     
-                    if (remaining < 30) {
+                    if (remaining < 10) {
                         setProximityStatus('HAZARD');
                     } else {
                         setProximityStatus('WARNING');
                     }
 
-                    // Trigger Alert at 90 seconds
+                    // Trigger Alert at 30 seconds
                     if (remaining <= 0 && !state.proximityAlertTriggered) {
                         state.proximityAlertTriggered = true;
                         setTherapyView('proximity_hazard');
@@ -235,7 +239,7 @@ function App() {
                     // Reset proximity timer if they move back
                     state.proximityStartTime = null;
                     state.proximityAlertTriggered = false;
-                    setProximityTimeLeft(90);
+                    setProximityTimeLeft(30);
                     setProximityStatus('SAFE');
                 }
 
@@ -456,6 +460,32 @@ function App() {
                      {statusText}
                  </div>
               </div>
+
+               {/* New Calibration Section */}
+               <div className="calibration-section">
+                   <div className="calib-info">
+                       <p>Resting Posture: <strong>{restingDistance}cm</strong></p>
+                       <p>Safe Threshold: <strong style={{color: '#ff4757'}}>{safeDistanceThreshold}cm</strong></p>
+                   </div>
+                   <button 
+                       className="btn-calibrate"
+                       onClick={() => {
+                           if (currentDistance) {
+                               const newResting = currentDistance;
+                               const newSafe = Math.max(35, newResting - 10);
+                               setRestingDistance(newResting);
+                               setSafeDistanceThreshold(newSafe);
+                               engineState.current.safeThreshold = newSafe; // Sync to engine ref immediately
+                               alert(`✅ Resting Posture Calibrated!\n\nNormal Distance: ${newResting}cm\nSafe Distance: ${newSafe}cm (with 10cm margin)`);
+                           } else {
+                               alert("❌ No face detected. Please face the camera to calibrate.");
+                           }
+                       }}
+                   >
+                       Set Resting Posture
+                   </button>
+                   <p className="calib-hint">Sit naturally and click to calibrate your safe distance.</p>
+               </div>
             </div>
 
             {/* Premium Metrics Panel */}
@@ -468,10 +498,10 @@ function App() {
                      <div className="diag-icon">
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                      </div>
-                     <div className="diag-content">
-                         <h4>Session Blinks</h4>
-                         <div className="diag-value huge-text">{blinkCount}</div>
-                     </div>
+                      <div className="diag-content">
+                          <h4>Blinks Per Min</h4>
+                          <div className="diag-value huge-text">{blinkRate}</div>
+                      </div>
                  </div>
 
                  {/* Block 2: EAR Core */}
@@ -492,10 +522,13 @@ function App() {
                      </div>
                      <div className="diag-content">
                          <h4>Screen distance</h4>
-                         <div className="diag-value huge-text">
-                             {currentDistance || "--"} <span style={{fontSize: '1rem'}}>cm</span>
-                         </div>
-                     </div>
+                          <div className="diag-value huge-text">
+                              {currentDistance || "--"} <span style={{fontSize: '1rem'}}>cm</span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '-8px' }}>
+                              Safe Threshold: {safeDistanceThreshold}cm
+                          </div>
+                      </div>
                      {proximityStatus !== 'SAFE' && (
                          <div className="proximity-timer-badge">
                              {proximityTimeLeft}s
@@ -681,11 +714,11 @@ function App() {
                   <div className="proximity-hazard-view" style={{ textAlign: 'center', padding: '2rem' }}>
                      <h1 className="danger-glow pulse-red">PROXIMITY HAZARD</h1>
                      <div className="warning-icon-large">⚠️</div>
-                     <p style={{ fontSize: '1.4rem', color: '#fff', maxWidth: '600px', margin: '0 auto 2rem' }}>
-                        You have been dangerously close to the screen (&lt; 25cm) for 90 seconds. 
+                      <p style={{ fontSize: '1.4rem', color: '#fff', maxWidth: '600px', margin: '0 auto 2rem' }}>
+                        You have been dangerously close to the screen (&lt; {safeDistanceThreshold}cm) for 30 seconds. 
                         This causes significant **Ciliary Muscle contraction** and long-term vision damage.
-                     </p>
-                     <h2 style={{ color: '#ff4757', fontSize: '2rem', marginBottom: '2rem' }}>Please move back at least 50cm to continue.</h2>
+                      </p>
+                     <h2 style={{ color: '#ff4757', fontSize: '2rem', marginBottom: '2rem' }}>Please move back at least {restingDistance}cm to continue.</h2>
                      <button className="btn-huge" onClick={() => {
                         setIsModalOpen(false);
                         setTherapyView('initial');
