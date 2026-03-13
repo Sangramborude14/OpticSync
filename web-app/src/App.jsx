@@ -13,6 +13,12 @@ const LEFT_EYE = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 const EAR_THRESHOLD = 0.25;
 
+// Screen Distance Constants
+const FOCAL_LENGTH = 500;       // Default focal length (pixels), will be calibrated later
+const AVG_EYE_DISTANCE_CM = 6.3; // Average inter-eye distance in cm
+const DANGER_DISTANCE_CM = 25;  // Too close threshold
+const SAFE_DISTANCE_CM = 40;    // Safe distance to auto-dismiss danger modal
+
 function calculateDistance(p1, p2) {
     return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 }
@@ -43,6 +49,13 @@ function App() {
   const [therapyView, setTherapyView] = useState('initial'); // 'initial', 'menu', or 'active'
   const [activeModule, setActiveModule] = useState(null);
   const [, setRenderTick] = useState(0); // Used to ensure React always renders 30fps smooth updates
+  const [lookAwayDisplay, setLookAwayDisplay] = useState(45);
+  const [connectionStatus, setConnectionStatus] = useState('idle'); // 'idle', 'connecting', 'active', 'error'
+  
+  // Screen Distance Tracking
+  const [distanceCm, setDistanceCm] = useState(null);
+  const [dangerTimerDisplay, setDangerTimerDisplay] = useState(0);
+  const [isPostureDangerModalOpen, setIsPostureDangerModalOpen] = useState(false);
   
   const videoRef = useRef(null);
   const engineState = useRef({
@@ -56,7 +69,12 @@ function App() {
     blinkStartTime: 0,
     lastTime: Date.now(),
     healthyBlinkStartTime: null,
-    lastFaceTime: Date.now()
+    lastFaceTime: Date.now(),
+    lookAwayActive: false,
+    lookAwayTimeLeft: 0,
+    // Screen distance danger timer
+    dangerTimer: 0,           // seconds accumulated too close to screen
+    dangerModalShown: false   // whether the posture danger modal is currently shown
   });
 
   useEffect(() => {
@@ -100,10 +118,77 @@ function App() {
             const dtSec = Math.min(0.1, Math.max(0, (now - state.lastTime) / 1000.0));
             state.lastTime = now;
 
+            if (state.lookAwayActive) {
+                if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                    state.lookAwayTimeLeft -= dtSec;
+                    setLookAwayDisplay(Math.max(0, state.lookAwayTimeLeft));
+                    if (state.lookAwayTimeLeft <= 0) {
+                        state.lookAwayActive = false;
+                        state.strain = 0;
+                        state.modalTriggered = false;
+                        state.modalCooldownUntil = now + 60000;
+                        setStrainLevel(0);
+                        setIsModalOpen(false);
+                        setTherapyView('initial');
+                        setTimeout(() => alert("✅ 45-Second Look Away Complete!\n\nYour eye strain has been safely reset to 0%."), 100);
+                        return;
+                    }
+                }
+            }
+
             if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
                 setStatusText("Engine Active - Tracking");
                 state.lastFaceTime = now;
                 const landmarks = results.multiFaceLandmarks[0];
+
+                // --- Screen Distance Tracking ---
+                // Landmarks 145 (left eye lower lid) and 374 (right eye lower lid)
+                const leftEyeL = landmarks[145];
+                const rightEyeL = landmarks[374];
+                const videoW = videoRef.current?.videoWidth || 640;
+                const videoH = videoRef.current?.videoHeight || 480;
+                
+                // Convert normalized coords to pixel space
+                const leftPx = { x: leftEyeL.x * videoW, y: leftEyeL.y * videoH };
+                const rightPx = { x: rightEyeL.x * videoW, y: rightEyeL.y * videoH };
+                
+                // Euclidean pixel distance between eyes
+                const pixelDist = Math.sqrt(
+                    Math.pow(rightPx.x - leftPx.x, 2) +
+                    Math.pow(rightPx.y - leftPx.y, 2)
+                );
+                
+                // Real-world depth estimation: distance_cm = (eye_width_cm * focal_length) / pixel_dist
+                const calculatedDist = pixelDist > 0
+                    ? (AVG_EYE_DISTANCE_CM * FOCAL_LENGTH) / pixelDist
+                    : null;
+
+                if (calculatedDist !== null) {
+                    setDistanceCm(calculatedDist);
+                    
+                    if (calculatedDist < DANGER_DISTANCE_CM) {
+                        // Accumulate danger time
+                        state.dangerTimer += dtSec;
+                        setDangerTimerDisplay(Math.min(90, state.dangerTimer));
+                        
+                        // Trigger posture danger modal after 90 continuous seconds
+                        if (state.dangerTimer >= 90 && !state.dangerModalShown) {
+                            state.dangerModalShown = true;
+                            setIsPostureDangerModalOpen(true);
+                        }
+                    } else {
+                        // User is at a reasonable distance — reset danger timer
+                        state.dangerTimer = 0;
+                        setDangerTimerDisplay(0);
+                        
+                        // Auto-dismiss posture danger modal when safe distance (>40cm) is reached
+                        if (state.dangerModalShown && calculatedDist > SAFE_DISTANCE_CM) {
+                            state.dangerModalShown = false;
+                            setIsPostureDangerModalOpen(false);
+                        }
+                    }
+                }
+                // --- End Screen Distance Tracking ---
                 
                 const leftEAR = calculateEAR(landmarks, LEFT_EYE);
                 const rightEAR = calculateEAR(landmarks, RIGHT_EYE);
@@ -210,7 +295,14 @@ function App() {
             if (e.data.type === 'tick') {
                 if (document.hidden && faceMesh && videoElement && videoElement.readyState >= 2) {
                     try {
-                        await faceMesh.send({ image: videoElement });
+                        // MediaPipe skips processing if the video timestamp hasn't changed (frozen background tab).
+                        // Drawing to an offscreen canvas sidesteps the internal timestamp check and prevents it from halting!
+                        const offscreen = document.createElement('canvas');
+                        offscreen.width = videoElement.videoWidth;
+                        offscreen.height = videoElement.videoHeight;
+                        const ctx = offscreen.getContext('2d');
+                        ctx.drawImage(videoElement, 0, 0, offscreen.width, offscreen.height);
+                        await faceMesh.send({ image: offscreen });
                     } catch (err) { }
                 }
             }
@@ -296,14 +388,10 @@ function App() {
   };
 
   const abortSession = () => {
-      alert("⚠️ Session Aborted!\n\nIf you must return to work, PLEASE look away from the screen for at least 2 minutes. OptiSync will continue to monitor your camera for resting behavior.");
-      setIsModalOpen(false);
-      setTherapyView('initial');
-      setActiveModule(null);
-      
-      // Do NOT reset the strain to 50! Give a 2-minute cooldown so the modal doesn't immediately snap back while they try to look away.
-      engineState.current.modalCooldownUntil = Date.now() + 120 * 1000; 
-      engineState.current.modalTriggered = false;
+      setTherapyView('look_away');
+      engineState.current.lookAwayActive = true;
+      engineState.current.lookAwayTimeLeft = 45;
+      setLookAwayDisplay(45);
   };
 
   return (
@@ -342,13 +430,41 @@ function App() {
             <h2>Welcome back.</h2>
             <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Cognitive operating system active.</p>
           </div>
-          <button className="btn-primary" 
-             onClick={() => {
-                 window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: Math.round(strainLevel) } }));
-                 alert("🟢 Status: Connected!\n\nOptiSync is now successfully bridging raw AI engine data to the Chrome Extension globally.");
+          <button 
+             className={`btn-primary connection-btn ${connectionStatus}`}
+             onClick={async () => {
+                 setConnectionStatus('connecting');
+                 try {
+                    const granted = await NotificationManager.requestPermission();
+                    if (granted) {
+                        setConnectionStatus('active');
+                        NotificationManager.sendTestAlert();
+                        window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: Math.round(strainLevel) } }));
+                    } else {
+                        setConnectionStatus('error');
+                        console.error("Notification permission denied.");
+                    }
+                 } catch (err) {
+                    setConnectionStatus('error');
+                 }
              }}
-             style={{ background: 'linear-gradient(135deg, #1abc9c, #2ecc71)', padding: '12px 24px', borderRadius: '12px', border: 'none', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>
-            Link Chrome Extension
+             style={{ 
+                background: connectionStatus === 'active' ? '#2ecc71' : connectionStatus === 'error' ? '#ff4757' : 'linear-gradient(135deg, #1abc9c, #2ecc71)', 
+                padding: '12px 24px', 
+                borderRadius: '12px', 
+                border: 'none', 
+                color: '#fff', 
+                fontWeight: '600', 
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+             }}>
+            {connectionStatus === 'idle' && <><span>🔗</span> Link Chrome Extension & Enable Alerts</>}
+            {connectionStatus === 'connecting' && <><span>⌛</span> Requesting Permissions...</>}
+            {connectionStatus === 'active' && <><span>✅</span> OptiSync Linked & Active</>}
+            {connectionStatus === 'error' && <><span>❌</span> Permission Denied (Check Settings)</>}
           </button>
         </header>
 
@@ -363,6 +479,19 @@ function App() {
                  <div className="webcam-status-overlay" style={{ background: statusText.includes("Face") ? "rgba(255, 71, 87, 0.8)" : "rgba(46, 204, 113, 0.6)" }}>
                      {statusText}
                  </div>
+                 {/* Screen Distance Badge */}
+                 {distanceCm !== null && (
+                   <div className={`distance-badge ${
+                     distanceCm < DANGER_DISTANCE_CM ? 'distance-danger' :
+                     distanceCm < SAFE_DISTANCE_CM  ? 'distance-warning' : 'distance-safe'
+                   }`}>
+                     <span className="distance-icon">📏</span>
+                     <span>{distanceCm.toFixed(1)} cm</span>
+                     {dangerTimerDisplay > 0 && (
+                       <span className="danger-timer-badge">⏱ {Math.floor(dangerTimerDisplay)}s</span>
+                     )}
+                   </div>
+                 )}
               </div>
             </div>
 
@@ -515,6 +644,27 @@ function App() {
         )}
       </main>
 
+      {/* Posture Danger Modal — auto-dismissed when safe distance restored */}
+      {isPostureDangerModalOpen && (
+        <div className="posture-danger-overlay">
+          <div className="posture-danger-modal">
+            <div className="posture-danger-icon">⚠️</div>
+            <h1 className="posture-danger-title">Posture Alert</h1>
+            <p className="posture-danger-message">
+              You have been closer than 25cm to the screen for 90 seconds.
+              Please sit back immediately to protect your eyes.
+            </p>
+            <div className="posture-danger-badge">
+              Move back beyond 40cm to dismiss
+            </div>
+            <div className="posture-danger-distance">
+              {distanceCm !== null ? `Current Distance: ${distanceCm.toFixed(1)} cm` : 'Calculating...'}
+            </div>
+            <div className="posture-danger-pulse"></div>
+          </div>
+        </div>
+      )}
+
       {/* 80% Full Screen Modal overlay natively in React */}
       {isModalOpen && (
          <div className="fullscreen-modal">
@@ -546,6 +696,26 @@ function App() {
                         </div>
                      </div>
                      <button className="btn-text" onClick={abortSession} style={{ marginTop: '3rem' }}>Abort Session (Return to work)</button>
+                  </div>
+               ) : therapyView === 'look_away' ? (
+                  <div className="look-away-view" style={{ textAlign: 'center', padding: '2rem' }}>
+                     <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#fff' }}>Rest Your Eyes</h2>
+                     <p style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.7)' }}>
+                        Please look away from the screen for 45 seconds to naturally recover.
+                     </p>
+                     <div style={{ marginTop: '3rem', fontSize: '6rem', fontWeight: '800', fontFamily: 'Outfit, sans-serif', color: lookAwayDisplay < 45 ? '#2ecc71' : '#f39c12', textShadow: `0 0 30px ${lookAwayDisplay < 45 ? 'rgba(46, 204, 113, 0.4)' : 'rgba(243, 156, 18, 0.4)'}` }}>
+                        {lookAwayDisplay.toFixed(1)}s
+                     </div>
+                     <p style={{ marginTop: '2rem', fontStyle: 'italic', opacity: 0.8, color: '#fff' }}>
+                        {lookAwayDisplay === 45 ? "Timer will start when you look away from the camera." : "Great! Keep looking away... Timer pauses if you look back."}
+                     </p>
+                     <button className="btn-text mt-4" onClick={() => {
+                        engineState.current.lookAwayActive = false;
+                        engineState.current.modalCooldownUntil = Date.now() + 120 * 1000;
+                        engineState.current.modalTriggered = false;
+                        setIsModalOpen(false);
+                        setTherapyView('initial');
+                     }} style={{ marginTop: '3rem', color: '#ff4757' }}>Force Quit (Not Recommended)</button>
                   </div>
                ) : (
                   <>

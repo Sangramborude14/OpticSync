@@ -436,3 +436,180 @@
 .btn-text:hover {
   color: white;
 }
+
+/* ==========================================
+   Screen Distance Badge (on webcam overlay)
+   ========================================== */
+.distance-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
+  transition: background 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
+}
+
+.distance-badge.distance-safe {
+  background: rgba(46, 204, 113, 0.25);
+  border: 1px solid rgba(46, 204, 113, 0.5);
+  color: #2ecc71;
+  box-shadow: 0 0 12px rgba(46, 204, 113, 0.2);
+}
+
+.distance-badge.distance-warning {
+  background: rgba(243, 156, 18, 0.25);
+  border: 1px solid rgba(243, 156, 18, 0.5);
+  color: #f39c12;
+  box-shadow: 0 0 12px rgba(243, 156, 18, 0.2);
+}
+
+.distance-badge.distance-danger {
+  background: rgba(255, 71, 87, 0.3);
+  border: 1px solid rgba(255, 71, 87, 0.7);
+  color: #ff4757;
+  box-shadow: 0 0 16px rgba(255, 71, 87, 0.4);
+  animation: badgePulse 1.2s ease-in-out infinite;
+}
+
+.distance-icon {
+  font-size: 1rem;
+}
+
+.danger-timer-badge {
+  background: rgba(255, 71, 87, 0.2);
+  border: 1px solid rgba(255, 71, 87, 0.4);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: #ff6b7a;
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(255, 71, 87, 0.4); }
+  50%       { box-shadow: 0 0 28px rgba(255, 71, 87, 0.8); }
+}
+
+/* ==========================================
+   Posture Danger Modal (auto-dismiss)
+   ========================================== */
+.posture-danger-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(10, 0, 0, 0.92);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: overlayFadeIn 0.5s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.posture-danger-modal {
+  position: relative;
+  background: linear-gradient(145deg, #1a0005, #200007, #1a0005);
+  border: 2px solid rgba(255, 71, 87, 0.8);
+  border-radius: 28px;
+  padding: 4rem 3.5rem;
+  text-align: center;
+  max-width: 680px;
+  width: 90%;
+  box-shadow:
+    0 0 60px rgba(255, 71, 87, 0.4),
+    0 0 120px rgba(255, 71, 87, 0.15),
+    inset 0 0 60px rgba(255, 0, 30, 0.07);
+  animation: modalSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(40px) scale(0.95); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+
+.posture-danger-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: iconShake 0.8s ease-in-out infinite alternate;
+  display: block;
+}
+
+@keyframes iconShake {
+  0%   { transform: rotate(-4deg) scale(1.0); }
+  100% { transform: rotate(4deg)  scale(1.1); }
+}
+
+.posture-danger-title {
+  font-size: 3rem;
+  font-weight: 900;
+  font-family: 'Outfit', sans-serif;
+  color: #ff4757;
+  text-shadow:
+    0 0 20px rgba(255, 71, 87, 0.8),
+    0 0 50px rgba(255, 71, 87, 0.4);
+  margin-bottom: 1.5rem;
+  letter-spacing: -1px;
+}
+
+.posture-danger-message {
+  font-size: 1.15rem;
+  line-height: 1.75;
+  color: rgba(255, 200, 200, 0.9);
+  margin-bottom: 2.5rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.posture-danger-badge {
+  display: inline-block;
+  background: rgba(255, 71, 87, 0.15);
+  border: 1px solid rgba(255, 71, 87, 0.4);
+  color: #ff8c96;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 50px;
+  letter-spacing: 0.5px;
+  margin-bottom: 1.25rem;
+  text-transform: uppercase;
+}
+
+.posture-danger-distance {
+  font-family: 'Outfit', monospace;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ff4757;
+  text-shadow: 0 0 15px rgba(255, 71, 87, 0.6);
+  letter-spacing: 1px;
+}
+
+/* Animated pulsing glow ring behind the modal */
+.posture-danger-pulse {
+  position: absolute;
+  inset: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 71, 87, 0.08) 0%, transparent 70%);
+  animation: ringPulse 1.8s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes ringPulse {
+  0%, 100% { transform: scale(1);    opacity: 0.6; }
+  50%       { transform: scale(1.06); opacity: 1;   }
+}
