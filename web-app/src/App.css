@@ -437,6 +437,7 @@
   color: white;
 }
 
+<<<<<<< HEAD
 /* Settings & Form UI */
 .settings-container {
     padding-bottom: 2rem;
@@ -572,3 +573,66 @@ body.light-mode .metrics-panel h3 {
     color: var(--text-main);
 }
 
+=======
+/* Proximity Sensor Styles */
+.proximity-block {
+    position: relative;
+    overflow: hidden;
+}
+
+.proximity-block.warning {
+    border-color: #f39c12 !important;
+    background: rgba(243, 156, 18, 0.05) !important;
+}
+
+.proximity-block.hazard {
+    border-color: #ff4757 !important;
+    background: rgba(255, 71, 87, 0.05) !important;
+}
+
+.proximity-timer-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #ff4757;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    box-shadow: 0 4px 10px rgba(255, 71, 87, 0.4);
+}
+
+.proximity-hazard-overlay {
+    background: linear-gradient(90deg, #ff4757, #c0392b);
+    color: white;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: 1px;
+    box-shadow: 0 8px 24px rgba(255, 71, 87, 0.3);
+    animation: slideDown 0.5s ease-out, proximityPulse 2s infinite;
+}
+
+.warning-icon-large {
+    font-size: 5rem;
+    margin: 2rem 0;
+}
+
+.pulse-red {
+    animation: proximityPulse 1.5s infinite;
+}
+
+@keyframes proximityPulse {
+    0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px rgba(255, 71, 87, 0.5); }
+    50% { transform: scale(1.05); opacity: 0.8; text-shadow: 0 0 30px rgba(255, 71, 87, 0.8); }
+    100% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px rgba(255, 71, 87, 0.5); }
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+>>>>>>> 61c9b5639ca6dc1dbc9a9c066aa022ede43ce359

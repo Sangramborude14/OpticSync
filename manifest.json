@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "notifications"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -24,6 +25,12 @@
     }
   ],
   "action": {
-    "default_title": "OptiSync"
+    "default_title": "OptiSync",
+    "default_icon": {
+      "128": "icon.png"
+    }
+  },
+  "icons": {
+    "128": "icon.png"
   }
 }
