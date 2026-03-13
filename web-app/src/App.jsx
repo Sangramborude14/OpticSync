@@ -7,6 +7,7 @@ import EyeMassage from './EyeMassage';
 import FocusShifter from './assets/FocusShifter.jsx';
 import InfinityTracker from './infinityTracker.jsx';
 import CornerTaps from './corner tap.jsx';
+import Setting from './Setting.jsx';
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -43,6 +44,28 @@ function App() {
   const [therapyView, setTherapyView] = useState('initial'); // 'initial', 'menu', or 'active'
   const [activeModule, setActiveModule] = useState(null);
   const [, setRenderTick] = useState(0); // Used to ensure React always renders 30fps smooth updates
+  const [isLightMode, setIsLightMode] = useState(localStorage.getItem('lightMode') === 'true');
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+    localStorage.setItem('lightMode', isLightMode);
+  }, [isLightMode]);
+
+  useEffect(() => {
+    const handleCamChange = () => {
+      // Force re-render of dashboard to reset camera if we are on dashboard tab
+      if (activeTab === 'dashboard') {
+         setActiveTab('settings');
+         setTimeout(() => setActiveTab('dashboard'), 100);
+      }
+    };
+    window.addEventListener('OPTISYNC_CAMERA_CHANGE', handleCamChange);
+    return () => window.removeEventListener('OPTISYNC_CAMERA_CHANGE', handleCamChange);
+  }, [activeTab]);
   
   const videoRef = useRef(null);
   const engineState = useRef({
@@ -174,8 +197,10 @@ function App() {
                 // Modal Trigger
                 if (state.strain >= 80 && !state.modalTriggered && now > state.modalCooldownUntil) {
                     state.modalTriggered = true;
-                    setIsModalOpen(true);
-                    NotificationManager.sendHighFatigueAlert(Math.round(state.strain));
+                    if (localStorage.getItem('notificationsEnabled') !== 'false') {
+                        setIsModalOpen(true);
+                        NotificationManager.sendHighFatigueAlert(Math.round(state.strain));
+                    }
                 }
                 
             } else {
@@ -193,6 +218,24 @@ function App() {
             }
         });
 
+        const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+            const preferredCamera = localStorage.getItem('preferredCamera');
+            if (preferredCamera && constraints.video) {
+                constraints.video.deviceId = { exact: preferredCamera };
+            }
+            try {
+                return await originalGetUserMedia(constraints);
+            } catch (err) {
+                // fallback if exact ID fails
+                if (constraints.video && constraints.video.deviceId) {
+                    delete constraints.video.deviceId;
+                    return await originalGetUserMedia(constraints);
+                }
+                throw err;
+            }
+        };
+
         camera = new window.Camera(videoElement, {
             onFrame: async () => {
                 await faceMesh.send({image: videoElement});
@@ -202,6 +245,11 @@ function App() {
         });
         
         camera.start();
+
+        // Restore original getUserMedia after initialization
+        setTimeout(() => {
+            navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+        }, 3000);
 
         // Start background worker for running in another tab
         worker = new Worker(new URL('./background/backgroundWorker.js', import.meta.url), { type: 'module' });
@@ -329,7 +377,7 @@ function App() {
           <li className="nav-link">
             <span>◷</span> History Log
           </li>
-          <li className="nav-link">
+          <li className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
             <span>⚙</span> Settings
           </li>
         </ul>
@@ -511,6 +559,13 @@ function App() {
                 onCancel={() => {
                     setActiveTab('therapy');
                 }}
+            />
+        )}
+
+        {activeTab === 'settings' && (
+            <Setting 
+                isLightMode={isLightMode} 
+                onModeToggle={setIsLightMode} 
             />
         )}
       </main>
