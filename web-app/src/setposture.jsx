@@ -88,30 +88,27 @@ export const useProximity = (onHazardTriggered) => {
  * UI Component: PostureCalibration
  */
 export const PostureCalibration = ({ currentDistance, restingDistance, safeThreshold, onCalibrate }) => (
-    <div className="calibration-box">
-        <div className="calib-header">
-            <div className="calib-stat">
+    <div className="calibration-section">
+        <div className="calib-info">
+            <div className="calib-item">
                 <span className="label">Resting</span>
-                <span className="value teal-glow">{restingDistance}cm</span>
+                <strong>{restingDistance}cm</strong>
             </div>
-            <div className="calib-divider"></div>
-            <div className="calib-stat">
+            <div className="calib-item">
                 <span className="label">Safe Limit</span>
-                <span className="value danger-glow-small">{safeThreshold}cm</span>
+                <strong style={{ color: '#ff4757' }}>{safeThreshold}cm</strong>
             </div>
         </div>
         
         <button 
-            className="btn-calibrate-premium" 
+            className="btn-calibrate" 
             onClick={onCalibrate}
             disabled={!currentDistance}
         >
-            <span className="btn-icon">🎯</span> Set Resting Posture
+            🎯 Set Current Posture as Resting
         </button>
         
-        <div className="calib-footer">
-            <p>Sit naturally and click to calibrate your safe distance</p>
-        </div>
+        <p className="calib-hint">Sit naturally at your desk and click to calibrate your safe distance range.</p>
     </div>
 );
 
@@ -119,42 +116,52 @@ export const PostureCalibration = ({ currentDistance, restingDistance, safeThres
  * UI Component: ProximitySensor
  */
 export const ProximitySensor = ({ currentDistance, safeThreshold, proximityStatus, proximityTimeLeft }) => (
-    <div className={`diagnostic-block proximity-card-premium ${proximityStatus.toLowerCase()}`}>
-        <div className="diag-icon-wrapper">
-            <div className="diag-icon-inner">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M2 12h20M7.07 7.07l1.41 1.41M15.52 15.52l1.41 1.41M2 12h2M20 12h2M12 2v2M12 20v2M7.07 16.93l1.41-1.41M15.52 8.48l1.41-1.41" />
-                </svg>
-            </div>
+    <div className={`diagnostic-block proximity-block ${proximityStatus.toLowerCase()}`}>
+        <div className="diag-icon" style={{ 
+            background: proximityStatus === 'SAFE' ? 'rgba(46, 204, 113, 0.1)' : proximityStatus === 'WARNING' ? 'rgba(243, 156, 18, 0.1)' : 'rgba(255, 71, 87, 0.1)',
+            color: proximityStatus === 'SAFE' ? '#2ecc71' : proximityStatus === 'WARNING' ? '#f39c12' : '#ff4757'
+        }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20M2 12h20M7.07 7.07l1.41 1.41M15.52 15.52l1.41 1.41M2 12h2M20 12h2M12 2v2M12 20v2M7.07 16.93l1.41-1.41M15.52 8.48l1.41-1.41" />
+            </svg>
         </div>
         
-        <div className="diag-content">
-            <div className="diag-header-row">
-                <h4>Screen distance</h4>
+        <div className="diag-content" style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4>Screen Proximity</h4>
                 {proximityStatus !== 'SAFE' && (
-                    <div className="hazard-badge">
-                        {proximityTimeLeft}s Remaining
-                    </div>
+                    <span className="proximity-timer-badge">{proximityTimeLeft}s</span>
                 )}
             </div>
             
-            <div className="dist-value-container">
-                <span className="dist-number">{currentDistance || "--"}</span>
-                <span className="dist-unit">CM</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                <span className="huge-text" style={{ 
+                    fontSize: '2.5rem',
+                    color: proximityStatus === 'SAFE' ? '#2ecc71' : proximityStatus === 'WARNING' ? '#f39c12' : '#ff4757'
+                }}>{currentDistance || "--"}</span>
+                <span style={{ fontSize: '0.8rem', opacity: 0.5, fontWeight: 700 }}>CM</span>
             </div>
             
-            <div className="threshold-indicator">
-                <div className="track">
-                    <div 
-                        className="thumb" 
-                        style={{ left: `${Math.min(100, (currentDistance / 150) * 100)}%` }}
-                    ></div>
-                    <div 
-                        className="safe-zone-marker" 
-                        style={{ left: `${(safeThreshold / 150) * 100}%` }}
-                    ></div>
-                </div>
-                <span className="threshold-label">Threshold: {safeThreshold}cm</span>
+            <div style={{ 
+                marginTop: '12px', 
+                height: '4px', 
+                background: 'rgba(255,255,255,0.05)', 
+                borderRadius: '2px',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                <div style={{ 
+                    position: 'absolute',
+                    height: '100%',
+                    background: proximityStatus === 'SAFE' ? '#2ecc71' : proximityStatus === 'WARNING' ? '#f39c12' : '#ff4757',
+                    width: `${Math.min(100, (currentDistance / 100) * 100)}%`,
+                    transition: 'width 0.4s ease'
+                }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                <span style={{ fontSize: '0.7rem', opacity: 0.4 }}>NEAR</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.8, color: '#ff4757' }}>SAFE: {safeThreshold}CM</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.4 }}>FAR</span>
             </div>
         </div>
     </div>
