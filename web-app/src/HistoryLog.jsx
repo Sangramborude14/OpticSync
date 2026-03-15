@@ -24,7 +24,7 @@ function HistoryLog() {
           let maxStrain = 0;
           let maxTime = '--:--';
           let sumStrain = 0;
-          
+
           fetchedData.forEach(d => {
             if (d.strain > maxStrain) {
               maxStrain = d.strain;
@@ -32,7 +32,7 @@ function HistoryLog() {
             }
             sumStrain += d.strain;
           });
-          
+
           setStats({
             peak: maxStrain,
             peakTime: maxTime,
@@ -54,35 +54,35 @@ function HistoryLog() {
         <h3 style={{ marginBottom: '1.5rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '1.5rem' }}>📈</span> Today's Strain Report
         </h3>
-        
+
         <div style={{ width: '100%', height: 400 }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorStrain" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff4757" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#1abc9c" stopOpacity={0.1}/>
+                  <stop offset="5%" stopColor="#ff4757" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#1abc9c" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="time" stroke="rgba(255,255,255,0.4)" />
               <YAxis stroke="rgba(255,255,255,0.4)" />
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'rgba(20,20,20,0.9)', 
-                  border: '1px solid rgba(255,255,255,0.1)', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(20,20,20,0.9)',
+                  border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '12px',
                   color: '#fff'
-                }} 
+                }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="strain" 
-                stroke="#1abc9c" 
+              <Area
+                type="monotone"
+                dataKey="strain"
+                stroke="#1abc9c"
                 strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorStrain)" 
-                activeDot={{ r: 8, fill: '#ff4757', stroke: '#fff', strokeWidth: 2 }} 
+                fillOpacity={1}
+                fill="url(#colorStrain)"
+                activeDot={{ r: 8, fill: '#ff4757', stroke: '#fff', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>

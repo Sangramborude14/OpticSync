@@ -1,186 +1,184 @@
-// Detect if we are natively running on the OptiSync Master Dashboard
-const isDashboard = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+// ── OptiSync Content Bridge & Widget ──
+// High-reliability communication for hackathon final MVP.
 
-if (!isDashboard) {
-    // Inject UI Components
-    const styleUrl = chrome.runtime.getURL('styles.css');
-    const link = document.createElement('link');
-    link.href = styleUrl;
-    link.type = 'text/css';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
+(function() {
+    // 1. Detection: Are we on the Master Dashboard?
+    const isDashboard = document.getElementById('optisync-master-link') !== null || 
+                        (window.location.hostname === "localhost" && document.querySelector('.dashboard-container') !== null);
 
-    const widgetHTML = `
-      <div id="optisync-widget" class="noselect">
-        <div class="opti-drag-handle">☰</div>
-        <div class="opti-score">
-          <span id="opti-strain-value">0</span>%
-          <div class="opti-label">STRAIN</div>
-        </div>
-        <button id="opti-btn-therapy" title="Manual Therapy Menu">✦</button>
-      </div>
-    `;
+    if (isDashboard) {
+        console.log("🟢 OptiSync Master Bridge: Dashboard Connected.");
 
-    const modal80HTML = `
-      <div id="optisync-modal" class="hidden">
-        <div class="opti-glass-panel">
-          <h2>Burnout Imminent</h2>
-          <p>Your strain score has reached 80%. Immediate action required to protect cognitive load.</p>
-          
-          <div id="opti-main-choices">
-            <button id="opti-btn-physical" class="opti-btn-primary">
-              Take a 5-Min Physical Break
-              <small>Look away from the screen. We will verify via webcam.</small>
-            </button>
-            <button id="opti-btn-enter-therapy" class="opti-btn-secondary">
-              Enter Therapy Session
-            </button>
-          </div>
-
-          <div id="opti-therapy-menu" class="hidden">
-            <h3>Therapy Modules</h3>
-            <div class="opti-therapy-branches">
-              <div class="opti-branch">
-                <h4>Digital Therapy</h4>
-                <button class="opti-btn-ghost">Flow State (Game 1)</button>
-                <button class="opti-btn-ghost">Zen Match (Game 2)</button>
-                <button class="opti-btn-ghost">Breathe Sync (Game 3)</button>
-              </div>
-              <div class="opti-branch">
-                <h4>Natural Therapy</h4>
-                <button class="opti-btn-ghost">Palming (Session 1)</button>
-                <button class="opti-btn-ghost">20-20-20 Rule (Session 2)</button>
-                <button class="opti-btn-ghost">Guided Stretch (Session 3)</button>
-              </div>
-            </div>
-            <button id="opti-btn-back" class="opti-btn-text">Back</button>
-          </div>
-
-        </div>
-      </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', widgetHTML + modal80HTML);
-
-    // Drag Logic for Widget
-    const widget = document.getElementById('optisync-widget');
-    let isDragging = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
-
-    widget.querySelector('.opti-drag-handle').addEventListener('mousedown', dragStart);
-    document.addEventListener('mousemove', drag);
-    document.addEventListener('mouseup', dragEnd);
-
-    function dragStart(e) {
-      initialX = e.clientX - xOffset;
-      initialY = e.clientY - yOffset;
-      if (e.target === widget.querySelector('.opti-drag-handle')) {
-        isDragging = true;
-      }
-    }
-    function drag(e) {
-      if (isDragging) {
-        e.preventDefault();
-        currentX = e.clientX - initialX;
-        currentY = e.clientY - initialY;
-        xOffset = currentX;
-        yOffset = currentY;
-        widget.style.transform = `translate(${currentX}px, ${currentY}px)`;
-      }
-    }
-    function dragEnd() {
-      initialX = currentX;
-      initialY = currentY;
-      isDragging = false;
-    }
-
-    // Logic & Interactivity
-    let scoreVal = document.getElementById('opti-strain-value');
-    let modal = document.getElementById('optisync-modal');
-    let mainChoices = document.getElementById('opti-main-choices');
-    let therapyMenu = document.getElementById('opti-therapy-menu');
-    let modalTriggered = false;
-
-    document.getElementById('opti-btn-therapy').addEventListener('click', () => {
-        // Manual Trigger
-        modal.classList.remove('hidden');
-        mainChoices.classList.add('hidden');
-        therapyMenu.classList.remove('hidden');
-    });
-
-    document.getElementById('opti-btn-enter-therapy').addEventListener('click', () => {
-        mainChoices.classList.add('hidden');
-        therapyMenu.classList.remove('hidden');
-    });
-
-    document.getElementById('opti-btn-back').addEventListener('click', () => {
-        if (scoreVal.innerText >= 80) {
-            // Must stay in lockdown if score is still >= 80
-            mainChoices.classList.remove('hidden');
-            therapyMenu.classList.add('hidden');
-        } else {
-            // Can dismiss if score is below 80 and was manually opened
-            modal.classList.add('hidden');
-        }
-    });
-
-    // A hack to unlock the physical break during hackathon
-    document.getElementById('opti-btn-physical').addEventListener('click', () => {
-       alert("Look away rule activated. Waiting for offscreen engine verification to unlock...");
-       // Usually we would poll the strain score here continuously until it hits < 50%
-       setTimeout(() => {
-         alert("Verified! Restored.");
-         modal.classList.add('hidden');
-         modalTriggered = false;
-       }, 3000); 
-    });
-
-    // Listener for Strain Updates from the Service Worker (Background)
-    chrome.runtime.onMessage.addListener((message) => {
-        if (message.type === 'UPDATE_UI') {
-            const score = message.strainScore;
-            scoreVal.innerText = score;
-
-            // Visual Feedback on widget
-            if (score > 50) {
-                widget.style.borderColor = 'rgba(255, 99, 132, 0.8)';
-                widget.style.boxShadow = '0 8px 32px 0 rgba(255, 99, 132, 0.3)';
-            } else {
-                widget.style.borderColor = 'rgba(46, 204, 113, 0.3)';
-                widget.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
+        window.addEventListener('message', (event) => {
+            if (event.source !== window) return;
+            if (event.data && event.data.type === 'OPTISYNC_STRAIN_UPDATE') {
+                chrome.runtime.sendMessage({
+                    type: 'BROADCAST_STRAIN',
+                    strainScore: event.data.strain
+                }).catch(() => {});
             }
-
-            // 80% Check
-            if (score >= 80 && !modalTriggered) {
-                 modalTriggered = true;
-                 modal.classList.remove('hidden');
-                 mainChoices.classList.remove('hidden');
-                 therapyMenu.classList.add('hidden');
-            } else if (score < 50 && modalTriggered) {
-                 // Auto dismiss if they recover without button clicks (e.g. eyes closed)
-                 modalTriggered = false;
-                 modal.classList.add('hidden');
-            }
-        }
-    });
-} else {
-    // We ARE on the Dashboard! Clean up any duplicate injected elements just in case.
-    const existingWidget = document.getElementById('optisync-widget');
-    const existingModal = document.getElementById('optisync-modal');
-    if (existingWidget) existingWidget.remove();
-    if (existingModal) existingModal.remove();
-}
-
-// ALWAYS listener for local React engine broadcasts (If this tab happens to be the Dashboard)
-// This is what bridges React out into the Chrome Extension Router
-window.addEventListener('OPTISYNC_STRAIN_PING', (e) => {
-    try {
-        // Forward this locally emitted strain score off to the background service worker! 
-        chrome.runtime.sendMessage({
-            type: 'BROADCAST_STRAIN',
-            strainScore: e.detail.strain
         });
-    } catch(err) {
-        // Suppress errors if extension context gets invalidated
-        console.warn("OptiSync Bridge: Could not contact Chrome extension runtime.", err);
+
+    } else {
+        // EXTERNAL TAB: Show Widget
+        console.log("🔵 OptiSync Widget: External Tab Active.");
+
+        let widget = document.getElementById('optisync-master-widget');
+        if (!widget) {
+            widget = document.createElement('div');
+            widget.id = 'optisync-master-widget';
+            widget.innerHTML = `
+                <div class="opti-widget-body">
+                    <div class="opti-score-box"><span id="opti-val">0</span><small>%</small></div>
+                    <div class="opti-label">EYE STRAIN</div>
+                </div>
+                <div id="opti-suggestion-bubble" class="opti-hidden">
+                    <div class="opti-suggest-content">
+                        <strong>OptiSync Tip:</strong>
+                        <span id="opti-suggest-text">Looking good! Keep it up.</span>
+                        <div class="opti-suggest-footer">Click to open Dashboard</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(widget);
+
+            const style = document.createElement('style');
+            style.textContent = `
+                #optisync-master-widget {
+                    position: fixed; bottom: 40px; right: 40px; z-index: 2147483647;
+                    background: #0f1015; border: 2px solid #2ecc71; border-radius: 50px;
+                    padding: 8px 18px; color: white; display: flex; flex-direction: column;
+                    align-items: center; font-family: 'Inter', sans-serif; 
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                    transition: border-color 0.4s ease;
+                    cursor: grab;
+                    user-select: none;
+                    touch-action: none;
+                }
+                #optisync-master-widget:active { cursor: grabbing; }
+                #opti-val { font-size: 24px; font-weight: 800; color: #2ecc71; pointer-events: none; }
+                .opti-label { font-size: 8px; font-weight: 700; opacity: 0.5; text-align: center; pointer-events: none; }
+                
+                #opti-suggestion-bubble {
+                    position: absolute;
+                    bottom: 120%;
+                    right: 0;
+                    width: 220px;
+                    background: #1e2128;
+                    border: 1px solid #2ecc71;
+                    border-radius: 16px;
+                    padding: 12px;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+                    pointer-events: none;
+                    transition: opacity 0.3s, transform 0.3s;
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                #opti-suggestion-bubble.opti-visible {
+                    opacity: 1;
+                    transform: translateY(0);
+                    pointer-events: auto;
+                }
+                .opti-suggest-content { font-size: 13px; color: #fff; text-align: left; }
+                .opti-suggest-content strong { display: block; margin-bottom: 4px; color: #2ecc71; }
+                .opti-suggest-footer { 
+                    margin-top: 8px; font-size: 10px; color: #94a3b8; 
+                    border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; 
+                    text-align: center; font-style: italic;
+                }
+                .opti-hidden { display: none; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        let isMouseDown = false;
+        let isMoving = false;
+        let startX, startY;
+        let initialLeft, initialTop;
+        let currentStrainLocal = 0;
+
+        const bubble = document.getElementById('opti-suggestion-bubble');
+
+        widget.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            isMoving = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = widget.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isMoving = true;
+            if (isMoving) {
+                widget.style.left = (initialLeft + dx) + 'px';
+                widget.style.top = (initialTop + dy) + 'px';
+                widget.style.bottom = 'auto';
+                widget.style.right = 'auto';
+                bubble.classList.remove('opti-visible');
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isMouseDown && !isMoving) {
+                // Toggle Bubble instead of immediate redirect
+                bubble.classList.toggle('opti-visible');
+            }
+            isMouseDown = false;
+        });
+
+        // Click on bubble to go to dashboard
+        bubble.addEventListener('click', (e) => {
+            e.stopPropagation();
+            chrome.runtime.sendMessage({ type: 'GO_TO_DASHBOARD' });
+        });
+
+        function getSuggestion(score) {
+            if (score >= 80) return "⚠️ CRITICAL! Your eyes need rest. Take a 20-20-20 break or start a therapy session now.";
+            if (score >= 40) return "💡 Strain is climbing. Try blinking more often or look at something 20 feet away.";
+            return "✅ You're doing great! Keep maintaining healthy blink habits.";
+        }
+
+        function updateWidget(score) {
+            currentStrainLocal = score;
+            const valEl = document.getElementById('opti-val');
+            const suggestEl = document.getElementById('opti-suggest-text');
+            
+            if (valEl) {
+                valEl.innerText = score;
+                if (score >= 80) {
+                    widget.style.borderColor = '#ff4757';
+                    bubble.style.borderColor = '#ff4757';
+                    valEl.style.color = '#ff4757';
+                    // Auto-show bubble info on high strain
+                    bubble.classList.add('opti-visible');
+                } else if (score >= 40) {
+                    widget.style.borderColor = '#f39c12';
+                    bubble.style.borderColor = '#f39c12';
+                    valEl.style.color = '#f39c12';
+                    // ALSO auto-show at 40% so user gets the "info" early
+                    bubble.classList.add('opti-visible');
+                } else {
+                    widget.style.borderColor = '#2ecc71';
+                    bubble.style.borderColor = '#2ecc71';
+                    valEl.style.color = '#2ecc71';
+                    // Auto-hide when safe
+                    if (score < 30) bubble.classList.remove('opti-visible');
+                }
+            }
+            if (suggestEl) suggestEl.innerText = getSuggestion(score);
+        }
+
+        chrome.runtime.sendMessage({ type: 'REQUEST_LATEST_STRAIN' }, (response) => {
+            if (response && response.strain !== undefined) updateWidget(response.strain);
+        });
+
+        chrome.runtime.onMessage.addListener((message) => {
+            if (message.type === 'UPDATE_WIDGET_UI') updateWidget(message.strain);
+        });
     }
-});
+})();

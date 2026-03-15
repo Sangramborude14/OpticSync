@@ -1,18 +1,19 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 
 app.use(cors());
 app.use(express.json());
 
+// ── MongoDB Setup ─────────────────────────────────────────────────
 mongoose.connect('mongodb://localhost:27017/optisync-history')
-  .then(() => console.log('MongoDB connected successfully'))
+  .then(() => console.log('✅ MongoDB connected successfully'))
   .catch(err => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit if DB connection fails
+    console.error('❌ MongoDB connection error:', err);
   });
 
 const strainSchema = new mongoose.Schema({
@@ -23,10 +24,14 @@ const strainSchema = new mongoose.Schema({
 
 const StrainRecord = mongoose.model('StrainRecord', strainSchema);
 
+// ── Endpoints ─────────────────────────────────────────────────────
+
 app.get('/api/health', (req, res) => {
   const rs = mongoose.connection.readyState;
-  const status = rs === 1 ? 'Healthy' : 'Disconnected';
-  res.json({ status, mongodb: status === 'Healthy' ? 'Connected' : 'Error', readyState: rs });
+  res.json({ 
+    status: 'online', 
+    mongodb: rs === 1 ? 'Connected' : 'Disconnected'
+  });
 });
 
 app.post('/api/strain', async (req, res) => {
@@ -77,5 +82,7 @@ app.get('/api/strain/today', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`\n🚀 OptiSync Backend Terminal`);
+  console.log(`📡 URL: http://localhost:${PORT}`);
+  console.log(`🛠️ Mode: Standard (Local Analytics)`);
 });

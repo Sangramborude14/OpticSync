@@ -58,6 +58,7 @@ function StrainToast({ toast, onClose }) {
 }
 
 function App() {
+    window.OPTISYNC_MASTER = true; // Hard Marker for Chrome Extension
     const [strainLevel, setStrainLevel] = useState(0);
     const [blinkRate, setBlinkRate] = useState(0);
     const [blinkCount, setBlinkCount] = useState(0);
@@ -269,53 +270,50 @@ function App() {
 
                     // Chrome Extension Integration: Broadcast live strain to content.js
                     window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedStrain } }));
+                    window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: roundedStrain }, "*");
 
                     // ── STRAIN ALERT SYSTEM ──────────────────────────────────────────
                     const notificationsEnabled = localStorage.getItem('notificationsEnabled') !== 'false';
+                    const mildThreshold = Number(localStorage.getItem('optisync_mild_threshold')) || 40;
+                    const severeThreshold = Number(localStorage.getItem('optisync_severe_threshold')) || 80;
 
-                    // 80% WARNING: In-app toast + OS notification (works in background)
-                    if (roundedStrain >= 80 && roundedStrain < 100) {
+                    // MILD WARNING: In-app toast + OS notification
+                    if (roundedStrain >= mildThreshold && roundedStrain < severeThreshold) {
                         const toastCooldown = 60000; // Only re-toast every 60s
                         if (notificationsEnabled && now - state.warningToastShownAt > toastCooldown) {
                             state.warningToastShownAt = now;
-                            // In-app toast (WhatsApp-style)
                             setToast({
                                 type: 'warning',
-                                title: 'Eye Strain Warning ⚠️',
-                                message: `Strain at ${roundedStrain}%. Look away or start a therapy session to recover.`
+                                title: 'Mild Eye Strain Warning 👁️',
+                                message: `Your strain is at ${roundedStrain}%. Consider looking away for 20 seconds.`
                             });
-                            // OS notification (works even in other tabs/apps)
+                            
                             const osCooldown = 120000; // OS notification every 2 min
                             if (now - state.warningNotifiedAt > osCooldown) {
                                 state.warningNotifiedAt = now;
                                 NotificationManager.sendHighFatigueAlert(roundedStrain);
                             }
                         }
-                        // Reset the 100% trigger if strain drops back below 100
                         state.criticalTriggered = false;
                     }
 
-                    // 100% CRITICAL: Focus tab + open modal + OS notification + toast
-                    if (roundedStrain >= 100 && !state.criticalTriggered && !state.modalTriggered && now > state.modalCooldownUntil) {
+                    // SEVERE CRITICAL: Open therapy modal + OS notification
+                    if (roundedStrain >= severeThreshold && !state.criticalTriggered && !state.modalTriggered && now > state.modalCooldownUntil) {
                         state.criticalTriggered = true;
                         state.modalTriggered = true;
-                        // In-app toast
                         setToast({
                             type: 'critical',
-                            title: '🚨 CRITICAL: Max Eye Strain',
-                            message: 'Strain at 100%! Opening therapy module now to protect your vision.'
+                            title: '🚨 SEVERE STRAIN DETECTED',
+                            message: `Strain reached ${roundedStrain}%! Mandatory therapy session required to reset.`
                         });
-                        // OS Notification (brings user back if they are in another app)
                         NotificationManager.sendCriticalStrainAlert();
-                        // Force focus this tab
                         window.focus();
-                        // Bring up the therapeutic intervention modal
                         setTherapyView('menu');
                         setIsModalOpen(true);
                     }
 
-                    // Reset critical once strain drops below 80 (full recovery)
-                    if (roundedStrain < 80) {
+                    // Reset critical once strain drops back safely (10% buffer below severe)
+                    if (roundedStrain < severeThreshold - 10) {
                         state.criticalTriggered = false;
                     }
                     // ── END STRAIN ALERT SYSTEM ──────────────────────────────────────
@@ -334,6 +332,7 @@ function App() {
 
                     // Chrome Extension Sync
                     window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedStrain } }));
+                    window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: roundedStrain }, "*");
                 }
             });
 
@@ -512,6 +511,8 @@ function App() {
         engineState.current.warningToastShownAt = 0;
         engineState.current.modalCooldownUntil = Date.now() + 60000; // 1 minute grace period
         setStrainLevel(0);
+        window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: 0 } }));
+        window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: 0 }, "*");
 
         setTimeout(() => alert("✅ Therapy Sequence Complete!\n\nYour eye strain has been safely reset to 0%."), 500);
     };
@@ -525,6 +526,9 @@ function App() {
 
     return (
         <div className="dashboard-container">
+            {/* Link for Chrome Extension Detection */}
+            <div id="optisync-master-link" style={{ display: 'none' }}></div>
+
             {/* Global In-App Strain Toast */}
             <StrainToast toast={toast} onClose={() => setToast(null)} />
 
@@ -586,7 +590,9 @@ function App() {
                                 if (granted) {
                                     setConnectionStatus('active');
                                     NotificationManager.sendTestAlert();
-                                    window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: Math.round(strainLevel) } }));
+                                    const roundedS = Math.round(strainLevel);
+                                    window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedS } }));
+                                    window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: roundedS }, "*");
                                 } else {
                                     setConnectionStatus('error');
                                     console.error("Notification permission denied.");
@@ -633,6 +639,7 @@ function App() {
                                 restingDistance={proximity.restingDistance}
                                 safeThreshold={proximity.safeThreshold}
                                 onCalibrate={proximity.calibrate}
+                                getRecommendation={proximity.getRecommendation}
                             />
                         </div>
 

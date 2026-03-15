@@ -1,85 +1,103 @@
-// Ensures the React App acts as the master AI Engine across Chrome.
+// ── OptiSync Extension Background Router (MV3) ──────────────────────
+// High-reliability messaging and OS-level notifications for hackathon MVP.
 
-let lastNotificationTime = 0;
-const NOTIFICATION_COOLDOWN_MS = 2 * 60 * 1000; // 2-minute cooldown between alerts
-let lastStrainScore = 0;
-let notificationShown = false;
+let globalStrain = 0;
+let lastMildAlert = 0;
+let lastSevereAlert = 0;
+const COOLDOWN_MS = 60 * 1000; // 1 minute cooldown to ensure alerts actually pop
 
-// Router: Listen for messages from the React App Dashboard via content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // React App Engine broadcast logic
-  if (message.type === 'BROADCAST_STRAIN') {
-    const score = message.strainScore;
-    lastStrainScore = score;
+    // 1. DATA SOURCE: Dashboard sends live strain levels
+    if (message.type === 'BROADCAST_STRAIN') {
+        globalStrain = message.strainScore;
+        
+        // Broadcast to all active tabs
+        broadcastToAllTabs(globalStrain);
+        
+        // Handle OS Notifications based on thresholds
+        checkAndNotify(globalStrain);
+    }
+    
+    // 2. TAB HANDSHAKE: When a new tab opens, it asks for the current score
+    if (message.type === 'REQUEST_LATEST_STRAIN') {
+        sendResponse({ strain: globalStrain });
+    }
 
-    // Blast this strain score outwards to EVERY open tab's widget
-    chrome.tabs.query({}, (tabs) => {
-      tabs.forEach(tab => {
-         // Prevent messaging background tabs that don't have content scripts yet
-         if(tab.url && !tab.url.startsWith("chrome://")) {
-             chrome.tabs.sendMessage(tab.id, {
-                type: 'UPDATE_UI',
-                strainScore: score
-             }).catch(() => {
-                 // Ignore if content script isn't mounted yet
-             });
-         }
-      });
-    });
+    // 3. NAVIGATION: Open/Focus the Dashboard
+    if (message.type === 'GO_TO_DASHBOARD') {
+        navigateToDashboard();
+    }
+});
 
-    // Fire OS-level notification when strain hits 80%
+function checkAndNotify(score) {
     const now = Date.now();
-    if (score >= 80 && !notificationShown && (now - lastNotificationTime) > NOTIFICATION_COOLDOWN_MS) {
-      lastNotificationTime = now;
-      notificationShown = true;
-
-      chrome.notifications.create('optisync-strain-alert', {
-        type: 'basic',
-        iconUrl: chrome.runtime.getURL('icon.png'),
-        title: 'OptiSync: High Eye Strain Detected! 🚨',
-        message: `Your cognitive strain has reached ${score}%. Take a break now to protect your vision.`,
-        priority: 2,
-        requireInteraction: true,
-        buttons: [
-          { title: 'Take a Break Now' },
-          { title: 'Dismiss' }
-        ]
-      });
+    
+    // SEVERE STRAIN ALERT (80%+)
+    if (score >= 80 && (now - lastSevereAlert > COOLDOWN_MS)) {
+        lastSevereAlert = now;
+        
+        // Create a unique notification to ensure it pops up even if one is already in Action Center
+        const notifId = 'severe-' + now;
+        
+        chrome.notifications.create(notifId, {
+            type: 'basic',
+            iconUrl: 'icon.png',
+            title: '🚨 OptiSync: Severe Eye Strain!',
+            message: `Your strain has reached ${score}%. Return to the dashboard to start therapy.`,
+            priority: 2,
+            requireInteraction: true
+        });
+        
+        console.log(`[OptiSync] Severe Alert sent at ${score}%`);
+    } 
+    // MILD STRAIN ALERT (40% - 60%)
+    else if (score >= 40 && score < 80 && (now - lastMildAlert > COOLDOWN_MS)) {
+        lastMildAlert = now;
+        
+        const notifId = 'mild-' + now;
+        
+        chrome.notifications.create(notifId, {
+            type: 'basic',
+            iconUrl: 'icon.png',
+            title: '💡 OptiSync: Eye Strain Warning',
+            message: `Strain is at ${score}%. You should blink more and look away.`,
+            priority: 1
+        });
+        
+        console.log(`[OptiSync] Mild Alert sent at ${score}%`);
     }
+}
 
-    // Reset notification flag when strain drops below 60% so future alerts can fire again
-    if (score < 60 && notificationShown) {
-      notificationShown = false;
-    }
-  }
-});
-
-// When user clicks the notification, switch focus to the OptiSync dashboard tab
-chrome.notifications.onClicked.addListener((notificationId) => {
-  if (notificationId === 'optisync-strain-alert') {
-    chrome.tabs.query({ url: '*://localhost/*' }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.update(tabs[0].id, { active: true });
-        chrome.windows.update(tabs[0].windowId, { focused: true });
-      }
-    });
-    chrome.notifications.clear(notificationId);
-  }
-});
-
-// Handle notification button clicks
-chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
-  if (notificationId === 'optisync-strain-alert') {
-    if (buttonIndex === 0) {
-      // "Take a Break Now" → focus the OptiSync tab
-      chrome.tabs.query({ url: '*://localhost/*' }, (tabs) => {
+function navigateToDashboard() {
+    chrome.tabs.query({ url: ['*://localhost:5173/*', '*://localhost:3000/*'] }, (tabs) => {
         if (tabs.length > 0) {
-          chrome.tabs.update(tabs[0].id, { active: true });
-          chrome.windows.update(tabs[0].windowId, { focused: true });
+            chrome.tabs.update(tabs[0].id, { active: true });
+            chrome.windows.update(tabs[0].windowId, { focused: true });
+        } else {
+            chrome.tabs.create({ url: 'http://localhost:5173' });
         }
-      });
-    }
-    chrome.notifications.clear(notificationId);
-  }
+    });
+}
+
+function broadcastToAllTabs(score) {
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.url && !tab.url.startsWith("chrome://")) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'UPDATE_WIDGET_UI',
+                    strain: score
+                }).catch(() => {});
+            }
+        });
+    });
+}
+
+// Click on notification takes user back to dashboard
+chrome.notifications.onClicked.addListener((id) => {
+    navigateToDashboard();
+    chrome.notifications.clear(id);
 });
 
+chrome.action.onClicked.addListener(() => {
+    navigateToDashboard();
+});

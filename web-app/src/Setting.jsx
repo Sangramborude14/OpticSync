@@ -4,6 +4,9 @@ const Setting = ({ isLightMode, onModeToggle }) => {
     const [cameras, setCameras] = useState([]);
     const [selectedCamera, setSelectedCamera] = useState(localStorage.getItem('preferredCamera') || '');
     const [notificationsEnabled, setNotificationsEnabled] = useState(localStorage.getItem('notificationsEnabled') !== 'false');
+    const [proximityDuration, setProximityDuration] = useState(Number(localStorage.getItem('optisync_proximity_duration')) || 30);
+    const [mildThreshold, setMildThreshold] = useState(Number(localStorage.getItem('optisync_mild_threshold')) || 40);
+    const [severeThreshold, setSevereThreshold] = useState(Number(localStorage.getItem('optisync_severe_threshold')) || 80);
 
     useEffect(() => {
         // Fetch cameras
@@ -40,6 +43,24 @@ const Setting = ({ isLightMode, onModeToggle }) => {
         const enabled = e.target.checked;
         setNotificationsEnabled(enabled);
         localStorage.setItem('notificationsEnabled', enabled);
+    };
+
+    const handleDurationChange = (e) => {
+        const value = Math.max(5, Math.min(300, Number(e.target.value))); // Clamp between 5s and 5m
+        setProximityDuration(value);
+        localStorage.setItem('optisync_proximity_duration', value);
+    };
+
+    const handleMildThresholdChange = (e) => {
+        const value = Math.max(10, Math.min(100, Number(e.target.value)));
+        setMildThreshold(value);
+        localStorage.setItem('optisync_mild_threshold', value);
+    };
+
+    const handleSevereThresholdChange = (e) => {
+        const value = Math.max(10, Math.min(100, Number(e.target.value)));
+        setSevereThreshold(value);
+        localStorage.setItem('optisync_severe_threshold', value);
     };
 
     return (
@@ -89,6 +110,58 @@ const Setting = ({ isLightMode, onModeToggle }) => {
                             />
                             <span className="slider"></span>
                         </label>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <h4>Proximity Hazard Period</h4>
+                            <p>Threshold duration (seconds) of being too close to the screen before a hazard alert is triggered.</p>
+                        </div>
+                        <input 
+                            type="number" 
+                            className="styled-select" 
+                            style={{ width: '80px', textAlign: 'center' }}
+                            value={proximityDuration} 
+                            onChange={handleDurationChange}
+                            min="5"
+                            max="300"
+                        />
+                    </div>
+                </div>
+
+                {/* Cognitive Strain Section */}
+                <div className="settings-section">
+                    <h3>Cognitive Strain Thresholds</h3>
+                    
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <h4>Mild Strain Notification (%)</h4>
+                            <p>An advisory notification will appear when your eye strain reaches this level.</p>
+                        </div>
+                        <input 
+                            type="number" 
+                            className="styled-select" 
+                            style={{ width: '80px', textAlign: 'center' }}
+                            value={mildThreshold} 
+                            onChange={handleMildThresholdChange}
+                            min="10"
+                            max="100"
+                        />
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <h4>Severe Strain Therapy Prompt (%)</h4>
+                            <p>For more critical strain, the system will prompt you to enter a mandatory therapy session.</p>
+                        </div>
+                        <input 
+                            type="number" 
+                            className="styled-select" 
+                            style={{ width: '80px', textAlign: 'center' }}
+                            value={severeThreshold} 
+                            onChange={handleSevereThresholdChange}
+                            min="10"
+                            max="100"
+                        />
                     </div>
                 </div>
 

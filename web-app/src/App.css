@@ -927,3 +927,128 @@ input:checked + .slider:before {
   margin: 0;
   text-align: center;
 }
+
+/* ── Gemini AI Posture Panel Animations ─────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.gemini-panel {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* --- Light Mode Overrides --- */
+body.light-mode {
+    background-image: radial-gradient(circle at 15% 50%, rgba(26, 188, 156, 0.05), transparent 25%),
+                      radial-gradient(circle at 85% 30%, rgba(46, 204, 113, 0.04), transparent 25%);
+}
+
+body.light-mode .sidebar {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+}
+
+body.light-mode .nav-link:hover, body.light-mode .nav-link.active {
+    background: rgba(26, 188, 156, 0.05);
+}
+
+body.light-mode .glass-card {
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+    background: #fff;
+}
+
+body.light-mode .webcam-card {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+body.light-mode .webcam-card h3 {
+    color: var(--text-main);
+}
+
+body.light-mode .diagnostic-block {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+body.light-mode .diag-value {
+    color: var(--text-main);
+}
+
+body.light-mode .huge-text {
+    color: var(--text-main);
+}
+
+body.light-mode .diag-content h4 {
+    color: var(--text-muted);
+}
+
+body.light-mode .header h2 {
+    color: var(--text-main);
+}
+
+body.light-mode .therapy-card {
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+body.light-mode .therapy-card:hover {
+    background: rgba(26, 188, 156, 0.05);
+    box-shadow: 0 8px 24px rgba(26, 188, 156, 0.1);
+}
+
+body.light-mode .btn-calibrate {
+    box-shadow: 0 4px 12px rgba(26, 188, 156, 0.2);
+}
+
+body.light-mode .premium-strain-box {
+    background: #fff;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+body.light-mode .progress-bar-container {
+    background: rgba(0,0,0,0.05);
+    box-shadow: none;
+}
+
+body.light-mode .fullscreen-modal {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+body.light-mode .modal-content-wrapper {
+    background: #fff;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.1);
+}
+
+body.light-mode .btn-huge {
+    box-shadow: 0 10px 30px rgba(26, 188, 156, 0.3);
+}
+
+body.light-mode .calib-info {
+    background: rgba(0,0,0,0.02);
+}
+
+body.light-mode .calib-item strong {
+    color: var(--text-main);
+}
+
+body.light-mode .calib-hint {
+    color: var(--text-muted);
+}
+
+body.light-mode .styled-select {
+    background: rgba(0,0,0,0.05);
+    color: var(--text-main);
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+body.light-mode .toggle-switch .slider {
+    background-color: rgba(0,0,0,0.1);
+}
+
