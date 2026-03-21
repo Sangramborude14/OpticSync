@@ -1,6 +1,7 @@
 # OptiSync OS - Cognitive Health & Proximity Monitoring System
 
-![OptiSync Logo](icon.png)
+<img width="1920" height="1080" alt="Screenshot (237)" src="https://github.com/user-attachments/assets/9c744f3b-9957-4392-8ac8-075bfe95ac52" />
+
 
 OptiSync OS is a cutting-edge **Cognitive Operating System** designed to monitor eye strain, posture, and burnout in real-time. By leveraging computer vision (MediaPipe) and AI, it helps digital professionals and students maintain ocular health through proactive alerts and interactive therapy modules.
 
