@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -78,6 +79,44 @@ app.get('/api/strain/today', async (req, res) => {
     res.json(reportData);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch strain history' });
+  }
+});
+
+app.post('/api/report', async (req, res) => {
+  try {
+    const { stats } = req.body;
+    
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+      return res.status(400).json({ error: 'Gemini API key is missing. Please add it to your .env file in the backend directory and restart the server.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    const prompt = `You are an expert occupational health and ergonomics advisor. 
+Analyze the following daily eye strain and fatigue data for a user using an eye-tracking "OptiSync" system.
+Strain ranges from 0 (Rested) to 100 (Severe Strain).
+
+Data Summary:
+- Average Daily Strain: ${stats?.avg || 0}%
+- Peak Strain Level: ${stats?.peak || 0}% at ${stats?.peakTime || 'N/A'}
+
+Provide a concise, encouraging, and highly professional Ergonomic Health Report. 
+Structure your response exactly like this:
+**Daily Assessment:** [Evaluate their average strain]
+**Key Insights:** [Identify their peak strain moment and potential causes]
+**Therapy Recommendation:** [Provide 1 actionable tip based on the data, like looking away or blinking]
+
+Tone: Clinical yet empathetic, premium feel. Limit the total output to 120 words. No overly complex markdown.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+
+    res.json({ report: response.text });
+  } catch (error) {
+    console.error('Error generating AI report:', error);
+    res.status(500).json({ error: 'Failed to generate AI report from Gemini' });
   }
 });
 

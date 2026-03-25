@@ -219,7 +219,7 @@ function App() {
 
                     // Restorative logic: if your eyes are closed completely, heal rapidly!
                     if (averageEAR < 0.18) {
-                        state.strain -= 8.0 * dtSec; // Realistic restore while resting eyes
+                        state.strain -= 5.0 * dtSec; // Slower, more stable restoration
                     }
 
                     // Blink Detection
@@ -242,7 +242,7 @@ function App() {
                                 setBlinkCount(state.blinks);
 
                                 // Normal blink recovery
-                                state.strain -= 1.0; // Reasonable per-blink healing
+                                state.strain -= 0.6; // Reduced per-blink healing for stability
                             }
 
                             state.isBlinking = false;
@@ -256,12 +256,12 @@ function App() {
 
                     // Staring Penalty
                     if (bpm < 5) {
-                        state.strain += 2.0 * dtSec; // Aggressive Penalty for hackathon visually
+                        state.strain += 1.2 * dtSec; // Reduced penalty for slower progression
                     } else if (bpm >= 5 && bpm <= 9) {
-                        state.strain += 0.5 * dtSec;
+                        state.strain += 0.3 * dtSec;
                     } else if (bpm >= 15) {
                         // Healthy blinking recovery
-                        state.strain -= 2.0 * dtSec;
+                        state.strain -= 1.2 * dtSec;
                     }
 
                     state.strain = Math.max(0, Math.min(100, state.strain));
@@ -324,8 +324,8 @@ function App() {
                     setStatusText("No Face Detected (Resting)");
                     setLiveEAR("N/A");
 
-                    // Looking away mechanism: (-15% over 10 seconds)
-                    state.strain -= 1.5 * dtSec;
+                    // Looking away mechanism: (-10% over 10 seconds)
+                    state.strain -= 1.0 * dtSec;
                     state.strain = Math.max(0, Math.min(100, state.strain));
                     const roundedStrain = Math.round(state.strain);
                     setStrainLevel(roundedStrain);
