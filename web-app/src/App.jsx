@@ -42,7 +42,7 @@ function StrainToast({ toast, onClose }) {
         if (!toast) return;
         const t = setTimeout(onClose, 6000);
         return () => clearTimeout(t);
-    }, [toast]);
+    }, [toast, onClose]);
 
     if (!toast) return null;
     return (
@@ -58,10 +58,12 @@ function StrainToast({ toast, onClose }) {
 }
 
 function App() {
-    window.OPTISYNC_MASTER = true; // Hard Marker for Chrome Extension
+    useEffect(() => {
+        window.OPTISYNC_MASTER = true; // Hard Marker for Chrome Extension
+    }, []);
     const [strainLevel, setStrainLevel] = useState(0);
     const [blinkRate, setBlinkRate] = useState(0);
-    const [blinkCount, setBlinkCount] = useState(0);
+    const [, setBlinkCount] = useState(0);
     const [liveEAR, setLiveEAR] = useState("0.00");
     const [statusText, setStatusText] = useState("Downloading AI Models (Takes 5-10s first time)...");
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -69,7 +71,6 @@ function App() {
     const [therapyView, setTherapyView] = useState('initial');
     const [activeModule, setActiveModule] = useState(null);
     const [backendStatus, setBackendStatus] = useState('checking');
-    const [, setRenderTick] = useState(0);
     const [lookAwayDisplay, setLookAwayDisplay] = useState(45);
     const [connectionStatus, setConnectionStatus] = useState('idle');
     const [toast, setToast] = useState(null); // { title, message, type: 'warning'|'critical' }
@@ -125,9 +126,9 @@ function App() {
         lowestEAR: 1.0,
         isBlinking: false,
         blinkStartTime: 0,
-        lastTime: Date.now(),
+        lastTime: 0,
         healthyBlinkStartTime: null,
-        lastFaceTime: Date.now(),
+        lastFaceTime: 0,
         lookAwayActive: false,
         lookAwayTimeLeft: 0,
         proximityStartTime: null,
@@ -137,6 +138,12 @@ function App() {
         criticalTriggered: false,   // whether 100% modal has been triggered this cycle
         warningToastShownAt: 0      // timestamp of last in-app toast
     });
+
+    useEffect(() => {
+        const now = Date.now();
+        engineState.current.lastTime = now;
+        engineState.current.lastFaceTime = now;
+    }, []);
 
     useEffect(() => {
         NotificationManager.requestPermission();
@@ -233,8 +240,6 @@ function App() {
                         }
                     } else {
                         if (state.isBlinking) {
-                            const blinkDuration = now - state.blinkStartTime;
-
                             if (state.lowestEAR <= CLOSED_THRESH) {
                                 // Full blink -> Decreases Strain
                                 state.blinks++;
@@ -384,7 +389,9 @@ function App() {
                             const ctx = offscreen.getContext('2d');
                             ctx.drawImage(videoElement, 0, 0, offscreen.width, offscreen.height);
                             await faceMesh.send({ image: offscreen });
-                        } catch (err) { }
+                        } catch (err) { 
+                            console.error("Background processing error:", err);
+                        }
                     }
                 }
             };
@@ -413,7 +420,7 @@ function App() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ strain: Math.round(currentStrain), blinkCount: currentBlinks })
-                }).catch(err => console.log('Backend sync warning: is server running?'));
+                }).catch(() => console.log('Backend sync warning: is server running?'));
             }
         }, 15000); // Sync every 15 seconds
 
@@ -598,6 +605,7 @@ function App() {
                                     console.error("Notification permission denied.");
                                 }
                             } catch (err) {
+                                console.error("Link extension error:", err);
                                 setConnectionStatus('error');
                             }
                         }}
