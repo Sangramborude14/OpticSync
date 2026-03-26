@@ -11,6 +11,7 @@ import CornerTaps from './corner tap.jsx';
 import Setting from './Setting.jsx';
 import { useProximity, PostureCalibration, ProximitySensor } from './setposture';
 import AIChatbot from './AIChatbot';
+import AITherapy from './AITherapy';
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -593,6 +594,9 @@ function App() {
                     <li className={`nav-link ${activeTab === 'therapy' ? 'active' : ''}`} onClick={() => setActiveTab('therapy')}>
                         <span>✦</span> Therapy Modules
                     </li>
+                    <li className={`nav-link ${activeTab === 'aitherapy' ? 'active' : ''}`} onClick={() => setActiveTab('aitherapy')}>
+                        <span>🤖</span> AI Insights
+                    </li>
                     <li className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                         <span>◷</span> History Log
                     </li>
@@ -845,6 +849,10 @@ function App() {
 
                 {activeTab === 'history' && (
                     <HistoryLog />
+                )}
+
+                {activeTab === 'aitherapy' && (
+                    <AITherapy />
                 )}
 
                 {activeTab === 'settings' && (

@@ -208,6 +208,51 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+app.post('/api/analyze-daily', async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const records = await StrainRecord.find({
+      timestamp: { $gte: startOfDay, $lte: endOfDay }
+    }).sort({ timestamp: 1 });
+
+    if (records.length === 0) {
+      return res.json({ analysis: "Not enough strain data collected today to provide an accurate therapy recommendation. Keep the application running to track your daily strain!" });
+    }
+
+    // Summarize data
+    let totalStrain = 0;
+    records.forEach(r => totalStrain += r.strain);
+    const avgStrain = Math.round(totalStrain / records.length);
+    const maxStrain = Math.max(...records.map(r => r.strain));
+    const avgBlinks = Math.round(records.reduce((sum, r) => sum + r.blinkCount, 0) / records.length);
+
+    const contents = [];
+    let systemMessage = SYSTEM_PROMPT;
+    systemMessage += `\n\nTask: The user wants an analysis of their daily eye strain today and specific recommendations for therapy to prevent strain. Respond clearly and format it beautifully with Markdown. Keep it brief but professional.\n\nToday's Metrics:
+- Average Strain: ${avgStrain}%
+- Max Strain reached: ${maxStrain}%
+- Average Blink Rate: ${avgBlinks} BPM
+- Number of data points: ${records.length}`;
+
+    contents.push({ role: 'user', parts: [{ text: systemMessage + '\n\nPlease provide your analysis and best therapy module suggestions.' }] });
+
+    const result = await callGeminiWithRetry(contents);
+
+    if (result.error) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    res.json({ analysis: result.reply });
+  } catch (error) {
+    console.error('Daily analysis endpoint error:', error);
+    res.status(500).json({ error: 'Failed to process daily analysis' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n🚀 OptiSync Backend Terminal`);
   console.log(`📡 URL: http://localhost:${PORT}`);
