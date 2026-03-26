@@ -10,6 +10,7 @@ import InfinityTracker from './infinityTracker.jsx';
 import CornerTaps from './corner tap.jsx';
 import Setting from './Setting.jsx';
 import { useProximity, PostureCalibration, ProximitySensor } from './setposture';
+import AIChatbot from './AIChatbot';
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -143,6 +144,7 @@ function App() {
         const now = Date.now();
         engineState.current.lastTime = now;
         engineState.current.lastFaceTime = now;
+        engineState.current.sessionStartTime = now;
     }, []);
 
     useEffect(() => {
@@ -226,7 +228,7 @@ function App() {
 
                     // Restorative logic: if your eyes are closed completely, heal rapidly!
                     if (averageEAR < 0.18) {
-                        state.strain -= 5.0 * dtSec; // Slower, more stable restoration
+                        state.strain -= 2.0 * dtSec; // Realistic restore while resting eyes
                     }
 
                     // Blink Detection
@@ -246,8 +248,9 @@ function App() {
                                 state.blinkHistory.push(now);
                                 setBlinkCount(state.blinks);
 
-                                // Normal blink recovery
-                                state.strain -= 0.6; // Reduced per-blink healing for stability
+                                // Normal blink recovery (Scaled for real-data study)
+                                state.strain -= 0.05; // Sustainable micro-recovery per blink
+                                state.lastBlinkTime = now;
                             }
 
                             state.isBlinking = false;
@@ -256,17 +259,50 @@ function App() {
                     }
 
                     state.blinkHistory = state.blinkHistory.filter(timestamp => now - timestamp <= 60000);
-                    const bpm = state.blinkHistory.length;
-                    setBlinkRate(bpm);
+                    
+                    // Predict BPM dynamically for the first 60 seconds
+                    // Blend actual blinks with a neutral 10 BPM baseline to prevent an unfair early "edge"
+                    const elapsedMinutes = Math.min(1.0, Math.max((now - state.sessionStartTime) / 60000, 0.05));
+                    let currentBpm = state.blinkHistory.length;
+                    if (elapsedMinutes < 1.0) {
+                        currentBpm = state.blinkHistory.length + (10.0 * (1.0 - elapsedMinutes));
+                    }
+                    const finalBpm = Math.round(currentBpm);
+                    setBlinkRate(finalBpm);
 
-                    // Staring Penalty
-                    if (bpm < 5) {
-                        state.strain += 1.2 * dtSec; // Reduced penalty for slower progression
-                    } else if (bpm >= 5 && bpm <= 9) {
-                        state.strain += 0.3 * dtSec;
-                    } else if (bpm >= 15) {
-                        // Healthy blinking recovery
-                        state.strain -= 1.2 * dtSec;
+                    // EAR Strain Penalty Tracking
+                    if (!state.lastBlinkTime) state.lastBlinkTime = now;
+                    const stareDuration = (now - state.lastBlinkTime) / 1000.0;
+
+                    let earModifier = 1.0;
+                    if (averageEAR >= 0.32) {
+                        earModifier = 1.8; // Eyes very wide open (Staring intently)
+                    } else if (averageEAR >= 0.28) {
+                        earModifier = 1.3; // Eyes moderately wide
+                    }
+
+                    // Scientific Strain Calculation (Digital Eye Strain Model)
+                    // Baseline: 100% strain over ~120 mins of screen exposure
+                    const baseStrainRate = (100 / 7200) * dtSec * earModifier;
+                    
+                    if (finalBpm < 5 || stareDuration > 6.0) {
+                        // Severe stare: ~20 mins to 100%
+                        // Also proactively triggers if you just haven't blinked in 6+ seconds
+                        state.strain += baseStrainRate + (0.08 * dtSec * earModifier); 
+                    } else if (finalBpm >= 5 && finalBpm <= 9) {
+                        // Moderate stare: ~45 mins to 100%
+                        state.strain += baseStrainRate + (0.03 * dtSec * earModifier);
+                    } else if (finalBpm >= 10 && finalBpm <= 14) {
+                        // Normal baseline screen usage
+                        state.strain += baseStrainRate;
+                    } else if (finalBpm >= 15) {
+                        // Healthy blinking (15+ bpm): Active eye lubrication recovery
+                        if (earModifier > 1.0) {
+                            // Deny continuous recovery if they are currently wide-eyed staring
+                            state.strain += baseStrainRate;
+                        } else {
+                            state.strain -= 0.05 * dtSec;
+                        }
                     }
 
                     state.strain = Math.max(0, Math.min(100, state.strain));
@@ -292,7 +328,7 @@ function App() {
                                 title: 'Mild Eye Strain Warning 👁️',
                                 message: `Your strain is at ${roundedStrain}%. Consider looking away for 20 seconds.`
                             });
-                            
+
                             const osCooldown = 120000; // OS notification every 2 min
                             if (now - state.warningNotifiedAt > osCooldown) {
                                 state.warningNotifiedAt = now;
@@ -389,7 +425,7 @@ function App() {
                             const ctx = offscreen.getContext('2d');
                             ctx.drawImage(videoElement, 0, 0, offscreen.width, offscreen.height);
                             await faceMesh.send({ image: offscreen });
-                        } catch (err) { 
+                        } catch (err) {
                             console.error("Background processing error:", err);
                         }
                     }
@@ -936,6 +972,15 @@ function App() {
                     </div>
                 </div>
             )}
+
+            {/* AI Health Assistant Chatbot */}
+            <AIChatbot
+                strainLevel={strainLevel}
+                blinkRate={blinkRate}
+                statusText={statusText}
+                postureStatus={proximity.proximityStatus}
+                currentDistance={proximity.currentDistance}
+            />
         </div>
     );
 }
