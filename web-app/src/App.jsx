@@ -365,8 +365,8 @@ function App() {
                     setStatusText("No Face Detected (Resting)");
                     setLiveEAR("N/A");
 
-                    // Looking away mechanism: (-15% over 10 seconds)
-                    state.strain -= 1.5 * dtSec;
+                    // Looking away mechanism: (-10% over 10 seconds)
+                    state.strain -= 1.0 * dtSec;
                     state.strain = Math.max(0, Math.min(100, state.strain));
                     const roundedStrain = Math.round(state.strain);
                     setStrainLevel(roundedStrain);
