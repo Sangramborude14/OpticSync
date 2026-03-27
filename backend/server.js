@@ -85,11 +85,12 @@ app.get('/api/strain/today', async (req, res) => {
 
 // ── Gemini AI Chat Endpoint ───────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELS = ['gemini-3.1-pro-preview', 'gemini-2.0-flash']; // Fallback enabled
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
-function getGeminiUrl(model) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-}
+// Simple response cache to avoid burning API calls
+const responseCache = { dailyAnalysis: null, dailyCacheTime: 0 };
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 const SYSTEM_PROMPT = `You are OptiSync AI — an expert AI health assistant embedded inside OptiSync OS, a cognitive health monitoring system that tracks eye strain via webcam using MediaPipe Face Mesh.
 
@@ -104,58 +105,30 @@ Your role:
 - You may be given live context about the user's current strain level and blink rate — use it to personalize your advice.`;
 
 async function callGeminiWithRetry(contents) {
-  for (const model of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await fetch(getGeminiUrl(model), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 512
-            }
-          })
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          const errorMsg = data.error.message || '';
-          console.log(`[Gemini] ${model} attempt ${attempt + 1}: ${errorMsg.substring(0, 80)}`);
-
-          if (errorMsg.includes('quota')) {
-            return { error: 'Your Gemini API key has exceeded its usage quota/billing limits. Please check your Google AI Studio account.' };
-          }
-          if (errorMsg.includes('rate') || response.status === 429) {
-            if (attempt === 0) {
-              await new Promise(r => setTimeout(r, 1500));
-              continue;
-            }
-            break; // try next model
-          }
-          return { error: errorMsg };
-        }
-
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (reply) {
-          console.log(`[Gemini] ✅ ${model} responded successfully`);
-          return { reply };
-        }
-        return { error: 'Empty response from AI model' };
-      } catch (err) {
-        console.error(`[Gemini] Network error (${model}):`, err.message);
-        if (attempt === 0) {
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
-        }
+  try {
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: contents,
+      config: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048
       }
+    });
+
+    if (response.text) {
+      console.log(`[Gemini] ✅ ${GEMINI_MODEL} responded successfully`);
+      return { reply: response.text };
     }
+    return { error: 'Empty response from AI model' };
+  } catch (err) {
+    console.error(`[Gemini] Error:`, err.message);
+    if (err.message.includes('quota') || err.message.includes('429')) {
+      return { error: 'Your Gemini API key has exceeded its usage quota/billing limits. Please check your Google AI Studio account.' };
+    }
+    return { error: err.message || 'AI is temporarily unavailable. Please try again. 🔄' };
   }
-  return { error: 'AI is temporarily rate-limited. Please wait a minute and try again. 🔄' };
 }
 
 app.post('/api/chat', async (req, res) => {
@@ -209,8 +182,41 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+app.post('/api/report', async (req, res) => {
+  try {
+    const { stats } = req.body;
+    if (!stats) {
+      return res.status(400).json({ error: 'Missing strain statistics' });
+    }
+
+    const reportPrompt = `You are OptiSync AI, a digital ergonomic specialist. Create an insightful ergonomic health report based on today's tracking data:
+- Peak Eye Strain: ${stats.peak}% (Reached at ${stats.peakTime})
+- Average Daily Strain: ${stats.avg}%
+
+Provide a professional analysis of these numbers. Explain what they mean for the user's cognitive focus and long-term eye health. Suggest 2-3 specific actions. Use Markdown formatting. Keep it concise but premium.`;
+
+    const result = await callGeminiWithRetry([{ role: 'user', parts: [{ text: reportPrompt }] }]);
+
+    if (result.error) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    res.json({ report: result.reply });
+  } catch (error) {
+    console.error('Report endpoint error:', error);
+    res.status(500).json({ error: 'Failed to process report request' });
+  }
+});
+
 app.post('/api/analyze-daily', async (req, res) => {
   try {
+    // Return cached analysis if fresh (saves API calls)
+    const now = Date.now();
+    if (responseCache.dailyAnalysis && (now - responseCache.dailyCacheTime < CACHE_TTL)) {
+      console.log('[Gemini] Returning cached daily analysis');
+      return res.json({ analysis: responseCache.dailyAnalysis });
+    }
+
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date();
@@ -232,20 +238,23 @@ app.post('/api/analyze-daily', async (req, res) => {
     const avgBlinks = Math.round(records.reduce((sum, r) => sum + r.blinkCount, 0) / records.length);
 
     const contents = [];
-    let systemMessage = SYSTEM_PROMPT;
-    systemMessage += `\n\nTask: The user wants an analysis of their daily eye strain today and specific recommendations for therapy to prevent strain. Respond clearly and format it beautifully with Markdown. Keep it brief but professional.\n\nToday's Metrics:
+    const dailyPrompt = `You are OptiSync AI, an expert health assistant. The user wants an analysis of their daily eye strain and specific recommendations for therapy to prevent strain. Respond clearly and format it beautifully with Markdown. DO NOT use conversational filler. Be detailed, professional, and structured.\n\nToday's Metrics:
 - Average Strain: ${avgStrain}%
 - Max Strain reached: ${maxStrain}%
 - Average Blink Rate: ${avgBlinks} BPM
 - Number of data points: ${records.length}`;
 
-    contents.push({ role: 'user', parts: [{ text: systemMessage + '\n\nPlease provide your analysis and best therapy module suggestions.' }] });
+    contents.push({ role: 'user', parts: [{ text: dailyPrompt + '\n\nPlease provide your analysis and best therapy module suggestions.' }] });
 
     const result = await callGeminiWithRetry(contents);
 
     if (result.error) {
       return res.status(500).json({ error: result.error });
     }
+
+    // Cache result
+    responseCache.dailyAnalysis = result.reply;
+    responseCache.dailyCacheTime = now;
 
     res.json({ analysis: result.reply });
   } catch (error) {

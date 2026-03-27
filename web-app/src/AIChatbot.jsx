@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import './AIChatbot.css';
 
 const SUGGESTIONS = [
@@ -80,13 +81,7 @@ function AIChatbot({ strainLevel, blinkRate, statusText, postureStatus, currentD
         }
     };
 
-    const formatMessage = (text) => {
-        // Basic markdown: bold, italic, and line breaks
-        return text
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/\n/g, '<br/>');
-    };
+
 
     return (
         <>
@@ -152,10 +147,19 @@ function AIChatbot({ strainLevel, blinkRate, statusText, postureStatus, currentD
                                 {msg.role === 'assistant' && (
                                     <div className="message-avatar">🤖</div>
                                 )}
-                                <div
-                                    className="message-bubble"
-                                    dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
-                                />
+                                <div className="message-bubble">
+                                    <ReactMarkdown
+                                        components={{
+                                            p: ({node, ...props}) => <p style={{margin: '0', padding: '0'}} {...props} />,
+                                            strong: ({node, ...props}) => <strong style={{color: msg.role === 'assistant' ? '#1abc9c' : 'inherit'}} {...props} />,
+                                            ul: ({node, ...props}) => <ul style={{margin: '0.5rem 0 0 1.2rem'}} {...props} />,
+                                            ol: ({node, ...props}) => <ol style={{margin: '0.5rem 0 0 1.2rem'}} {...props} />,
+                                            li: ({node, ...props}) => <li style={{marginBottom: '0.2rem'}} {...props} />
+                                        }}
+                                    >
+                                        {msg.content}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
                         ))}
                         {isLoading && (

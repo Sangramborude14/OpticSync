@@ -4,23 +4,43 @@
 let globalStrain = 0;
 let lastMildAlert = 0;
 let lastSevereAlert = 0;
+let userMildThreshold = 40;
+let userSevereThreshold = 80;
 const COOLDOWN_MS = 60 * 1000; // 1 minute cooldown to ensure alerts actually pop
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // 1. DATA SOURCE: Dashboard sends live strain levels
+    // 1. DATA SOURCE: Dashboard sends live strain levels + user thresholds
     if (message.type === 'BROADCAST_STRAIN') {
         globalStrain = message.strainScore;
         
-        // Broadcast to all active tabs
+        // Update thresholds from user settings (sent from dashboard)
+        if (message.mildThreshold) userMildThreshold = message.mildThreshold;
+        if (message.severeThreshold) userSevereThreshold = message.severeThreshold;
+        
+        // Broadcast to all active tabs (include thresholds so widget uses them)
         broadcastToAllTabs(globalStrain);
         
-        // Handle OS Notifications based on thresholds
+        // Handle OS Notifications based on USER-configured thresholds
         checkAndNotify(globalStrain);
+    }
+    
+    if (message.type === 'BROADCAST_PROXIMITY') {
+        const dist = message.currentDistance;
+        broadcastToAllTabsProximity(dist);
+        checkAndNotifyProximity(dist);
+    }
+    
+    if (message.type === 'BROADCAST_TOAST') {
+        broadcastToAllTabsToast(message.toast);
     }
     
     // 2. TAB HANDSHAKE: When a new tab opens, it asks for the current score
     if (message.type === 'REQUEST_LATEST_STRAIN') {
-        sendResponse({ strain: globalStrain });
+        sendResponse({ 
+            strain: globalStrain,
+            mildThreshold: userMildThreshold,
+            severeThreshold: userSevereThreshold
+        });
     }
 
     // 3. NAVIGATION: Open/Focus the Dashboard
@@ -32,11 +52,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function checkAndNotify(score) {
     const now = Date.now();
     
-    // SEVERE STRAIN ALERT (80%+)
-    if (score >= 80 && (now - lastSevereAlert > COOLDOWN_MS)) {
+    // SEVERE STRAIN ALERT (user-configured threshold)
+    if (score >= userSevereThreshold && (now - lastSevereAlert > COOLDOWN_MS)) {
         lastSevereAlert = now;
         
-        // Create a unique notification to ensure it pops up even if one is already in Action Center
         const notifId = 'severe-' + now;
         
         chrome.notifications.create(notifId, {
@@ -50,8 +69,8 @@ function checkAndNotify(score) {
         
         console.log(`[OptiSync] Severe Alert sent at ${score}%`);
     } 
-    // MILD STRAIN ALERT (40% - 60%)
-    else if (score >= 40 && score < 80 && (now - lastMildAlert > COOLDOWN_MS)) {
+    // MILD STRAIN ALERT (user-configured threshold)
+    else if (score >= userMildThreshold && score < userSevereThreshold && (now - lastMildAlert > COOLDOWN_MS)) {
         lastMildAlert = now;
         
         const notifId = 'mild-' + now;
@@ -65,6 +84,29 @@ function checkAndNotify(score) {
         });
         
         console.log(`[OptiSync] Mild Alert sent at ${score}%`);
+    }
+}
+
+let lastProximityAlert = 0;
+
+function checkAndNotifyProximity(dist) {
+    const now = Date.now();
+    // Proximity alert cooldown of 2 minutes to avoid spam
+    if (now - lastProximityAlert > 120000) {
+        lastProximityAlert = now;
+        
+        const notifId = 'proximity-' + now;
+        
+        chrome.notifications.create(notifId, {
+            type: 'basic',
+            iconUrl: 'icon.png',
+            title: '🚨 OptiSync: Proximity Hazard!',
+            message: `You are too close to the screen (${Math.round(dist)}cm). Please move back to protect your vision!`,
+            priority: 2,
+            requireInteraction: true
+        });
+        
+        console.log(`[OptiSync] Proximity Alert sent at ${dist}cm`);
     }
 }
 
@@ -85,7 +127,35 @@ function broadcastToAllTabs(score) {
             if (tab.url && !tab.url.startsWith("chrome://")) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: 'UPDATE_WIDGET_UI',
-                    strain: score
+                    strain: score,
+                    mildThreshold: userMildThreshold,
+                    severeThreshold: userSevereThreshold
+                }).catch(() => {});
+            }
+        });
+    });
+}
+
+function broadcastToAllTabsProximity(dist) {
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.url && !tab.url.startsWith("chrome://")) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'UPDATE_PROXIMITY_UI',
+                    currentDistance: dist
+                }).catch(() => {});
+            }
+        });
+    });
+}
+
+function broadcastToAllTabsToast(toast) {
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.url && !tab.url.startsWith("chrome://")) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'UPDATE_TOAST_UI',
+                    toast: toast
                 }).catch(() => {});
             }
         });

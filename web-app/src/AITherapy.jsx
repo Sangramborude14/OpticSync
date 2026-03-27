@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 function AITherapy() {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const formatMessage = (text) => {
-        return text
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/\n/g, '<br/>');
-    };
+
 
     const fetchAnalysis = async () => {
         setLoading(true);
@@ -62,7 +58,22 @@ function AITherapy() {
 
             {analysis && (
                 <div className="glass-card" style={{ padding: '30px', marginTop: '20px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '15px' }}>
-                    <div dangerouslySetInnerHTML={{ __html: formatMessage(analysis) }} style={{ lineHeight: '1.8', fontSize: '1.05rem', color: '#fff' }} />
+                    <div style={{ lineHeight: '1.8', fontSize: '1.05rem', color: '#fff' }}>
+                        <ReactMarkdown 
+                            components={{
+                                h1: ({node, ...props}) => <h1 style={{fontSize: '1.5rem', marginBottom: '0.8rem'}} {...props} />,
+                                h2: ({node, ...props}) => <h2 style={{fontSize: '1.3rem', marginBottom: '0.8rem', marginTop: '1rem'}} {...props} />,
+                                h3: ({node, ...props}) => <h3 style={{fontSize: '1.1rem', marginBottom: '0.6rem', marginTop: '1rem'}} {...props} />,
+                                p: ({node, ...props}) => <p style={{marginBottom: '0.8rem'}} {...props} />,
+                                ul: ({node, ...props}) => <ul style={{marginLeft: '20px', marginBottom: '1rem'}} {...props} />,
+                                ol: ({node, ...props}) => <ol style={{marginLeft: '20px', listStyleType: 'decimal', marginBottom: '1rem'}} {...props} />,
+                                li: ({node, ...props}) => <li style={{marginBottom: '0.4rem'}} {...props} />,
+                                strong: ({node, ...props}) => <strong style={{color: '#1abc9c'}} {...props} />
+                            }}
+                        >
+                            {analysis}
+                        </ReactMarkdown>
+                    </div>
                 </div>
             )}
         </div>

@@ -52,7 +52,7 @@ const Setting = ({ isLightMode, onModeToggle }) => {
     };
 
     const handleMildThresholdChange = (e) => {
-        const value = Math.max(10, Math.min(100, Number(e.target.value)));
+        const value = Math.max(5, Math.min(95, Number(e.target.value)));
         setMildThreshold(value);
         localStorage.setItem('optisync_mild_threshold', value);
     };
@@ -134,34 +134,42 @@ const Setting = ({ isLightMode, onModeToggle }) => {
                     
                     <div className="setting-item">
                         <div className="setting-info">
-                            <h4>Mild Strain Notification (%)</h4>
-                            <p>An advisory notification will appear when your eye strain reaches this level.</p>
+                            <h4>Mild Strain Notification at <span style={{ color: '#f39c12', fontWeight: 800 }}>{mildThreshold}%</span></h4>
+                            <p>You'll be alerted when your eye strain reaches this level. Set it as low as you want — your choice.</p>
                         </div>
-                        <input 
-                            type="number" 
-                            className="styled-select" 
-                            style={{ width: '80px', textAlign: 'center' }}
-                            value={mildThreshold} 
-                            onChange={handleMildThresholdChange}
-                            min="10"
-                            max="100"
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '200px' }}>
+                            <input 
+                                type="range" 
+                                className="styled-range"
+                                style={{ width: '140px', accentColor: '#f39c12' }}
+                                value={mildThreshold} 
+                                onChange={handleMildThresholdChange}
+                                min="5"
+                                max="95"
+                                step="1"
+                            />
+                            <span style={{ color: '#f39c12', fontWeight: 700, fontSize: '1.1rem', minWidth: '45px', textAlign: 'center' }}>{mildThreshold}%</span>
+                        </div>
                     </div>
 
                     <div className="setting-item">
                         <div className="setting-info">
-                            <h4>Severe Strain Therapy Prompt (%)</h4>
-                            <p>For more critical strain, the system will prompt you to enter a mandatory therapy session.</p>
+                            <h4>Severe Strain Therapy Prompt at <span style={{ color: '#ff4757', fontWeight: 800 }}>{severeThreshold}%</span></h4>
+                            <p>At this level, the system will prompt a mandatory therapy session. Must be higher than mild threshold.</p>
                         </div>
-                        <input 
-                            type="number" 
-                            className="styled-select" 
-                            style={{ width: '80px', textAlign: 'center' }}
-                            value={severeThreshold} 
-                            onChange={handleSevereThresholdChange}
-                            min="10"
-                            max="100"
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '200px' }}>
+                            <input 
+                                type="range" 
+                                className="styled-range"
+                                style={{ width: '140px', accentColor: '#ff4757' }}
+                                value={severeThreshold} 
+                                onChange={handleSevereThresholdChange}
+                                min="10"
+                                max="100"
+                                step="1"
+                            />
+                            <span style={{ color: '#ff4757', fontWeight: 700, fontSize: '1.1rem', minWidth: '45px', textAlign: 'center' }}>{severeThreshold}%</span>
+                        </div>
                     </div>
                 </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -169,18 +170,16 @@ function HistoryLog() {
 
           {aiReport && !reportError && (
             <div className="ai-report-content" style={{ color: 'rgba(255,255,255,0.8)', lineHeight: '1.8', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)', position: 'relative', zIndex: 1 }}>
-              {aiReport.split('\n').map((line, idx) => {
-                if (line.trim().startsWith('**')) {
-                  const parts = line.split('**');
-                  return (
-                    <p key={idx} style={{ marginBottom: line.trim() === '' ? '0' : '15px' }}>
-                      <strong style={{ color: '#a29bfe', fontSize: '1.1rem', marginRight: '6px' }}>{parts[1]}</strong>
-                      {parts.slice(2).join('')}
-                    </p>
-                  );
-                }
-                return line.trim() ? <p key={idx} style={{ marginBottom: '15px' }}>{line}</p> : null;
-              })}
+              <ReactMarkdown
+                components={{
+                  p: ({node, ...props}) => <p style={{marginBottom: '15px'}} {...props} />,
+                  strong: ({node, ...props}) => <strong style={{color: '#a29bfe', fontSize: '1.1rem', marginRight: '6px'}} {...props} />,
+                  ul: ({node, ...props}) => <ul style={{marginLeft: '20px', marginBottom: '1rem'}} {...props} />,
+                  li: ({node, ...props}) => <li style={{marginBottom: '0.4rem'}} {...props} />
+                }}
+              >
+                {aiReport}
+              </ReactMarkdown>
             </div>
           )}
           
