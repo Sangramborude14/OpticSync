@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+const API_BASE_URL = import.meta.env.PROD ? "" : "http://localhost:5001";
+
 function AITherapy() {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -12,7 +14,7 @@ function AITherapy() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch('http://localhost:5001/api/analyze-daily', {
+            const res = await fetch(`${API_BASE_URL}/api/analyze-daily`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });

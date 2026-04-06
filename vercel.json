@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "web-app/package.json",
+      "use": "@vercel/vite"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/server.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/web-app/$1"
+    }
+  ]
+}

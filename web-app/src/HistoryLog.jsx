@@ -4,6 +4,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
+const API_BASE_URL = import.meta.env.PROD ? "" : "http://localhost:5001";
+
 function HistoryLog() {
   const [data, setData] = useState([]);
   const [stats, setStats] = useState({ peak: 0, peakTime: '--:--', avg: 0 });
@@ -16,7 +18,7 @@ function HistoryLog() {
     setIsGenerating(true);
     setReportError('');
     try {
-      const response = await fetch('http://localhost:5001/api/report', {
+      const response = await fetch(`${API_BASE_URL}/api/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stats })
@@ -36,12 +38,12 @@ function HistoryLog() {
 
   useEffect(() => {
     // Check Health
-    fetch('http://localhost:5001/api/health')
+    fetch(`${API_BASE_URL}/api/health`)
       .then(res => res.json())
       .then(res => setDbStatus(res.mongodb))
       .catch(() => setDbStatus('Offline'));
 
-    fetch('http://localhost:5001/api/strain/today')
+    fetch(`${API_BASE_URL}/api/strain/today`)
       .then(res => res.json())
       .then(fetchedData => {
         if (!Array.isArray(fetchedData)) return;

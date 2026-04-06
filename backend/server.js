@@ -12,7 +12,8 @@ app.use(cors());
 app.use(express.json());
 
 // ── MongoDB Setup ─────────────────────────────────────────────────
-mongoose.connect('mongodb://localhost:27017/optisync-history')
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/optisync-history';
+mongoose.connect(MONGODB_URI)
   .then(() => console.log('✅ MongoDB connected successfully'))
   .catch(err => {
     console.error('❌ MongoDB connection error:', err);
@@ -263,9 +264,13 @@ app.post('/api/analyze-daily', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 OptiSync Backend Terminal`);
-  console.log(`📡 URL: http://localhost:${PORT}`);
-  console.log(`🛠️ Mode: Standard (Local Analytics)`);
-  console.log(`🤖 Gemini AI: ${GEMINI_API_KEY ? 'Configured' : '❌ Missing API Key'}`);
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 OptiSync Backend Terminal`);
+    console.log(`📡 URL: http://localhost:${PORT}`);
+    console.log(`🛠️ Mode: Standard (Local Analytics)`);
+    console.log(`🤖 Gemini AI: ${GEMINI_API_KEY ? 'Configured' : '❌ Missing API Key'}`);
+  });
+}
+
+module.exports = app;

@@ -13,6 +13,8 @@ import { useProximity, PostureCalibration, ProximitySensor } from './setposture'
 import AIChatbot from './AIChatbot';
 import AITherapy from './AITherapy';
 
+const API_BASE_URL = import.meta.env.PROD ? "" : "http://localhost:5001";
+
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
@@ -117,7 +119,7 @@ function App() {
     // Backend health check
     useEffect(() => {
         const checkBackend = () => {
-            fetch('http://localhost:5001/api/health')
+            fetch(`${API_BASE_URL}/api/health`)
                 .then(res => res.json())
                 .then(data => setBackendStatus(data.mongodb === 'Connected' ? 'live' : 'error'))
                 .catch(() => setBackendStatus('offline'));
@@ -471,7 +473,7 @@ function App() {
             const currentBlinks = engineState.current?.blinks || 0;
 
             if (activeTab === 'dashboard') {
-                fetch('http://localhost:5001/api/strain', {
+                fetch(`${API_BASE_URL}/api/strain`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ strain: Math.round(currentStrain), blinkCount: currentBlinks })
