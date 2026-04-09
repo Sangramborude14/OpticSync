@@ -11,6 +11,9 @@ import CornerTaps from './CornerTaps.jsx';
 import Setting from './Setting.jsx';
 import { useProximity, PostureCalibration, ProximitySensor } from './setposture';
 import AIChatbot from './AIChatbot';
+import AITherapy from './AITherapy';
+
+const API_BASE_URL = import.meta.env.PROD ? "" : "http://localhost:5001";
 
 // Eye Landmark Indices
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
@@ -77,9 +80,18 @@ function App() {
     const [toast, setToast] = useState(null); // { title, message, type: 'warning'|'critical' }
 
     // Proximity hook for clean state management & calibration
-    const proximity = useProximity(() => {
+    const proximity = useProximity((dist) => {
         setTherapyView('proximity_hazard');
         setIsModalOpen(true);
+        window.postMessage({ type: 'OPTISYNC_PROXIMITY_HAZARD', currentDistance: dist }, "*");
+        
+        const newToast = {
+            type: 'critical',
+            title: '🚨 PROXIMITY HAZARD',
+            message: `You are sitting too close to the screen (${Math.round(dist)}cm). Move back!`
+        };
+        setToast(newToast);
+        window.postMessage({ type: 'OPTISYNC_SHOW_TOAST', toast: newToast }, "*");
     });
 
     const [isLightMode, setIsLightMode] = useState(localStorage.getItem('lightMode') === 'true');
@@ -107,7 +119,7 @@ function App() {
     // Backend health check
     useEffect(() => {
         const checkBackend = () => {
-            fetch('http://localhost:5001/api/health')
+            fetch(`${API_BASE_URL}/api/health`)
                 .then(res => res.json())
                 .then(data => setBackendStatus(data.mongodb === 'Connected' ? 'live' : 'error'))
                 .catch(() => setBackendStatus('offline'));
@@ -311,7 +323,12 @@ function App() {
 
                     // Chrome Extension Integration: Broadcast live strain to content.js
                     window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedStrain } }));
-                    window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: roundedStrain }, "*");
+                    window.postMessage({ 
+                        type: 'OPTISYNC_STRAIN_UPDATE', 
+                        strain: roundedStrain,
+                        mildThreshold: Number(localStorage.getItem('optisync_mild_threshold')) || 40,
+                        severeThreshold: Number(localStorage.getItem('optisync_severe_threshold')) || 80
+                    }, "*");
 
                     // ── STRAIN ALERT SYSTEM ──────────────────────────────────────────
                     const notificationsEnabled = localStorage.getItem('notificationsEnabled') !== 'false';
@@ -323,11 +340,13 @@ function App() {
                         const toastCooldown = 60000; // Only re-toast every 60s
                         if (notificationsEnabled && now - state.warningToastShownAt > toastCooldown) {
                             state.warningToastShownAt = now;
-                            setToast({
+                            const newToast = {
                                 type: 'warning',
                                 title: 'Mild Eye Strain Warning 👁️',
                                 message: `Your strain is at ${roundedStrain}%. Consider looking away for 20 seconds.`
-                            });
+                            };
+                            setToast(newToast);
+                            window.postMessage({ type: 'OPTISYNC_SHOW_TOAST', toast: newToast }, "*");
 
                             const osCooldown = 120000; // OS notification every 2 min
                             if (now - state.warningNotifiedAt > osCooldown) {
@@ -342,11 +361,13 @@ function App() {
                     if (roundedStrain >= severeThreshold && !state.criticalTriggered && !state.modalTriggered && now > state.modalCooldownUntil) {
                         state.criticalTriggered = true;
                         state.modalTriggered = true;
-                        setToast({
+                        const newToast = {
                             type: 'critical',
                             title: '🚨 SEVERE STRAIN DETECTED',
                             message: `Strain reached ${roundedStrain}%! Mandatory therapy session required to reset.`
-                        });
+                        };
+                        setToast(newToast);
+                        window.postMessage({ type: 'OPTISYNC_SHOW_TOAST', toast: newToast }, "*");
                         NotificationManager.sendCriticalStrainAlert();
                         window.focus();
                         setTherapyView('menu');
@@ -452,7 +473,7 @@ function App() {
             const currentBlinks = engineState.current?.blinks || 0;
 
             if (activeTab === 'dashboard') {
-                fetch('http://localhost:5001/api/strain', {
+                fetch(`${API_BASE_URL}/api/strain`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ strain: Math.round(currentStrain), blinkCount: currentBlinks })
@@ -592,6 +613,9 @@ function App() {
                     </li>
                     <li className={`nav-link ${activeTab === 'therapy' ? 'active' : ''}`} onClick={() => setActiveTab('therapy')}>
                         <span>✦</span> Therapy Modules
+                    </li>
+                    <li className={`nav-link ${activeTab === 'aitherapy' ? 'active' : ''}`} onClick={() => setActiveTab('aitherapy')}>
+                        <span>🤖</span> AI Insights
                     </li>
                     <li className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                         <span>◷</span> History Log
@@ -873,6 +897,10 @@ function App() {
 
                 {activeTab === 'history' && (
                     <HistoryLog />
+                )}
+
+                {activeTab === 'aitherapy' && (
+                    <AITherapy />
                 )}
 
                 {activeTab === 'settings' && (
