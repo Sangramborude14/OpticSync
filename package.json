@@ -1,0 +1,54 @@
+{
+  "name": "opticsync",
+  "version": "1.0.0",
+  "description": "<<<<<<< HEAD\r # <p align=\"center\">👁️ OptiSync — Cognitive OS</p>",
+  "main": "main.js",
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run web-app\" \"wait-on http://localhost:5173 && electron .\"",
+    "backend": "cd backend && node server.js",
+    "web-app": "cd web-app && npm run dev",
+    "backend:install": "cd backend && npm install",
+    "build:frontend": "cd web-app && npm run build",
+    "dist": "npm run build:frontend && electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.optisync.desktop",
+    "productName": "OptiSync Desktop",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png",
+      "backend/**/*",
+      "web-app/dist/**/*"
+    ],
+    "directories": {
+      "output": "dist-app"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sangramborude14/OpticSync.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sangramborude14/OpticSync/issues"
+  },
+  "homepage": "https://github.com/Sangramborude14/OpticSync#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "electron-is-dev": "^3.0.1",
+    "tree-kill": "^1.2.2",
+    "wait-on": "^9.0.4"
+  }
+}

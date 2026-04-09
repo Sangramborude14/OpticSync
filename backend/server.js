@@ -12,7 +12,8 @@ app.use(cors());
 app.use(express.json());
 
 // ── MongoDB Setup ─────────────────────────────────────────────────
-mongoose.connect('mongodb://localhost:27017/optisync-history')
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/optisync-history';
+mongoose.connect(mongoUri)
   .then(() => console.log('✅ MongoDB connected successfully'))
   .catch(err => {
     console.error('❌ MongoDB connection error:', err);
@@ -85,11 +86,8 @@ app.get('/api/strain/today', async (req, res) => {
 
 // ── Gemini AI Chat Endpoint ───────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELS = ['gemini-3.1-pro-preview', 'gemini-2.0-flash']; // Fallback enabled
-
-function getGeminiUrl(model) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-}
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const MODEL_NAME = 'gemini-2.5-flash';
 
 const SYSTEM_PROMPT = `You are OptiSync AI — an expert AI health assistant embedded inside OptiSync OS, a cognitive health monitoring system that tracks eye strain via webcam using MediaPipe Face Mesh.
 
@@ -103,59 +101,31 @@ Your role:
 - If the user asks about things unrelated to health or OptiSync, politely redirect.
 - You may be given live context about the user's current strain level and blink rate — use it to personalize your advice.`;
 
-async function callGeminiWithRetry(contents) {
-  for (const model of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await fetch(getGeminiUrl(model), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 512
-            }
-          })
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          const errorMsg = data.error.message || '';
-          console.log(`[Gemini] ${model} attempt ${attempt + 1}: ${errorMsg.substring(0, 80)}`);
-
-          if (errorMsg.includes('quota')) {
-            return { error: 'Your Gemini API key has exceeded its usage quota/billing limits. Please check your Google AI Studio account.' };
-          }
-          if (errorMsg.includes('rate') || response.status === 429) {
-            if (attempt === 0) {
-              await new Promise(r => setTimeout(r, 1500));
-              continue;
-            }
-            break; // try next model
-          }
-          return { error: errorMsg };
-        }
-
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (reply) {
-          console.log(`[Gemini] ✅ ${model} responded successfully`);
-          return { reply };
-        }
-        return { error: 'Empty response from AI model' };
-      } catch (err) {
-        console.error(`[Gemini] Network error (${model}):`, err.message);
-        if (attempt === 0) {
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
-        }
+async function callGemini(contents) {
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents,
+      config: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 512
       }
+    });
+
+    if (response.text) {
+      console.log(`[Gemini] ✅ ${MODEL_NAME} responded successfully`);
+      return { reply: response.text };
     }
+    return { error: 'Empty response from AI model' };
+  } catch (error) {
+    console.error(`[Gemini] Error (${MODEL_NAME}):`, error.message);
+    if (error.message.includes('quota')) {
+      return { error: 'Your Gemini API key has exceeded its usage quota.' };
+    }
+    return { error: 'AI reasoning is temporarily unavailable. Please try again. 🔄' };
   }
-  return { error: 'AI is temporarily rate-limited. Please wait a minute and try again. 🔄' };
 }
 
 app.post('/api/chat', async (req, res) => {
@@ -196,7 +166,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const result = await callGeminiWithRetry(contents);
+    const result = await callGemini(contents);
 
     if (result.error) {
       return res.status(500).json({ error: result.error });

@@ -9,6 +9,30 @@
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --glass-border: rgba(255, 255, 255, 0.05);
+  --premium-grad: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+}
+
+.premium-greeting {
+  font-size: 2.2rem;
+  font-weight: 800;
+  background: var(--premium-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -1px;
+}
+
+.desktop-badge {
+  background: rgba(26, 188, 156, 0.1);
+  color: var(--accent-teal);
+  border: 1px solid rgba(26, 188, 156, 0.3);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
 }
 
 body.light-mode {

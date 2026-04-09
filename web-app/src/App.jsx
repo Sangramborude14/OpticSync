@@ -7,7 +7,7 @@ import EyeMassage from './EyeMassage';
 import FocusShifter from './assets/FocusShifter.jsx';
 import HistoryLog from './HistoryLog.jsx';
 import InfinityTracker from './infinityTracker.jsx';
-import CornerTaps from './corner tap.jsx';
+import CornerTaps from './CornerTaps.jsx';
 import Setting from './Setting.jsx';
 import { useProximity, PostureCalibration, ProximitySensor } from './setposture';
 import AIChatbot from './AIChatbot';
@@ -620,53 +620,80 @@ function App() {
             {/* Main Content */}
             <main className="main-content">
                 <header className="header">
-                    <div>
-                        <h2>Welcome back.</h2>
-                        <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>Cognitive operating system active.</p>
+                    <div className="welcome-section">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <h2 className="premium-greeting">Welcome back, OptiSync User.</h2>
+                            {window.electronAPI && <span className="desktop-badge">DESKTOP v1.0</span>}
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', marginTop: '8px', fontSize: '1.1rem' }}>
+                            Cognitive monitoring system is <span style={{ color: '#2ecc71', fontWeight: 600 }}>Active</span>.
+                        </p>
                     </div>
-                    <button
-                        className={`btn-primary connection-btn ${connectionStatus}`}
-                        onClick={async () => {
-                            setConnectionStatus('connecting');
-                            try {
-                                const granted = await NotificationManager.requestPermission();
-                                if (granted) {
-                                    setConnectionStatus('active');
-                                    NotificationManager.sendTestAlert();
-                                    const roundedS = Math.round(strainLevel);
-                                    window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedS } }));
-                                    window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: roundedS }, "*");
-                                } else {
+                    <div className="header-actions">
+                        <button
+                            className={`btn-primary connection-btn ${connectionStatus}`}
+                            onClick={async () => {
+                                setConnectionStatus('connecting');
+                                try {
+                                    const granted = await NotificationManager.requestPermission();
+                                    if (granted) {
+                                        setConnectionStatus('active');
+                                        NotificationManager.sendTestAlert();
+                                        const roundedS = Math.round(strainLevel);
+                                        window.dispatchEvent(new CustomEvent('OPTISYNC_STRAIN_PING', { detail: { strain: roundedS } }));
+                                        window.postMessage({ type: 'OPTISYNC_STRAIN_UPDATE', strain: roundedS }, "*");
+                                    } else {
+                                        setConnectionStatus('error');
+                                        console.error("Notification permission denied.");
+                                    }
+                                } catch (err) {
+                                    console.error("Link extension error:", err);
                                     setConnectionStatus('error');
-                                    console.error("Notification permission denied.");
                                 }
-                            } catch (err) {
-                                console.error("Link extension error:", err);
-                                setConnectionStatus('error');
-                            }
-                        }}
-                        style={{
-                            background: connectionStatus === 'active' ? '#2ecc71' : connectionStatus === 'error' ? '#ff4757' : 'linear-gradient(135deg, #1abc9c, #2ecc71)',
-                            padding: '12px 24px',
-                            borderRadius: '12px',
-                            border: 'none',
-                            color: '#fff',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                        {connectionStatus === 'idle' && <><span>🔗</span> Link Chrome Extension &amp; Enable Alerts</>}
-                        {connectionStatus === 'connecting' && <><span>⌛</span> Requesting Permissions...</>}
-                        {connectionStatus === 'active' && <><span>✅</span> OptiSync Linked &amp; Active</>}
-                        {connectionStatus === 'error' && <><span>❌</span> Permission Denied (Check Settings)</>}
-                    </button>
+                            }}
+                            style={{
+                                background: connectionStatus === 'active' ? '#2ecc71' : connectionStatus === 'error' ? '#ff4757' : 'linear-gradient(135deg, #1abc9c, #2ecc71)',
+                                padding: '12px 24px',
+                                borderRadius: '12px',
+                                border: 'none',
+                                color: '#fff',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}>
+                            {connectionStatus === 'idle' && <><span>🔗</span> Link Extension &amp; Alerts</>}
+                            {connectionStatus === 'connecting' && <><span>⌛</span> Requesting...</>}
+                            {connectionStatus === 'active' && <><span>✅</span> System Linked</>}
+                            {connectionStatus === 'error' && <><span>❌</span> Error</>}
+                        </button>
+                    </div>
                 </header>
 
                 {activeTab === 'dashboard' && (
-                    <div className="main-grid">
+                    <div className="dashboard-content">
+                        <div className="summary-cards">
+                            <div className="summary-card">
+                                <span className="card-label">Blink Quality</span>
+                                <span className="card-value">{blinkRate > 12 ? 'Excellent' : 'Low'}</span>
+                            </div>
+                            <div className="summary-card">
+                                <span className="card-label">Focus Score</span>
+                                <span className="card-value">{100 - strainLevel}%</span>
+                            </div>
+                            <div className="summary-card">
+                                <span className="card-label">Session Time</span>
+                                <span className="card-value">0h 42m</span>
+                            </div>
+                            <div className="summary-card">
+                                <span className="card-label">AI Status</span>
+                                <span className="card-value">Ready</span>
+                            </div>
+                        </div>
+
+                        <div className="main-grid">
 
                         {/* Webcam Frame */}
                         <div className="glass-card webcam-card">
@@ -753,6 +780,7 @@ function App() {
                         </div>
 
                     </div>
+                </div>
                 )}
 
                 {activeTab === 'therapy' && (
